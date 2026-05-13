@@ -63,6 +63,37 @@ class TradingRepository:
 
         return [dict(row) for row in rows][::-1]
 
+    def save_price_snapshot(
+        self,
+        code,
+        name,
+        current_price,
+        volume=None,
+        raw_current_price=None,
+        raw_volume=None,
+    ):
+        sql = """
+        INSERT INTO price_snapshot (
+            code, name, current_price, volume, raw_current_price, raw_volume
+        )
+        VALUES (?, ?, ?, ?, ?, ?)
+        """
+
+        with get_connection() as conn:
+            cursor = conn.execute(
+                sql,
+                (
+                    code,
+                    name,
+                    current_price,
+                    volume,
+                    raw_current_price,
+                    raw_volume,
+                ),
+            )
+            conn.commit()
+            return cursor.lastrowid
+
     def save_signal(self, code, signal_type, strategy_name, price, reason):
         sql = """
         INSERT INTO signals (

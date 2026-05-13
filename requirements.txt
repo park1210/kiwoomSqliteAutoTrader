@@ -1,1 +1,2 @@
-pandas
+PyQt5
+pywin32

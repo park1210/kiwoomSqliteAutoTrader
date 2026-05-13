@@ -2,7 +2,10 @@ from pathlib import Path
 
 APP_NAME = "Kiwoom SQLite Auto Trader"
 
-# v1에서는 실제 주문하지 않음
+# 실행 버전
+RUN_VERSION = "v2"  # v1 / v2
+
+# v1, v2에서는 실제 주문하지 않음
 MODE = "simulation"  # simulation / paper / live
 
 BASE_DIR = Path(__file__).resolve().parent

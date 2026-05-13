@@ -46,3 +46,14 @@ CREATE TABLE IF NOT EXISTS system_logs (
     detail TEXT,
     created_at TEXT DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE TABLE IF NOT EXISTS price_snapshot (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    code TEXT NOT NULL,
+    name TEXT,
+    current_price INTEGER,
+    volume INTEGER,
+    raw_current_price TEXT,
+    raw_volume TEXT,
+    captured_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
