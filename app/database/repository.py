@@ -110,6 +110,109 @@ class TradingRepository:
             conn.commit()
             return cursor.lastrowid
 
+    def save_order(
+        self,
+        code,
+        name,
+        account_no,
+        order_type,
+        quantity,
+        price,
+        hoga_gb,
+        reason,
+        status="REQUESTED",
+    ):
+        sql = """
+        INSERT INTO orders (
+            code, name, account_no, order_type, quantity,
+            price, hoga_gb, status, reason
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """
+
+        with get_connection() as conn:
+            cursor = conn.execute(
+                sql,
+                (
+                    code,
+                    name,
+                    account_no,
+                    order_type,
+                    quantity,
+                    price,
+                    hoga_gb,
+                    status,
+                    reason,
+                ),
+            )
+            conn.commit()
+            return cursor.lastrowid
+
+    def update_order_status(
+        self,
+        order_id,
+        status,
+        kiwoom_order_no=None,
+    ):
+        sql = """
+        UPDATE orders
+        SET status = ?,
+            kiwoom_order_no = COALESCE(?, kiwoom_order_no),
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+        """
+
+        with get_connection() as conn:
+            conn.execute(sql, (status, kiwoom_order_no, order_id))
+            conn.commit()
+
+    def save_execution(
+        self,
+        order_id,
+        code,
+        name,
+        kiwoom_order_no,
+        order_status,
+        order_type_raw,
+        quantity,
+        price,
+        unfilled_quantity,
+        execution_price,
+        execution_quantity,
+        execution_time,
+        raw_data,
+    ):
+        sql = """
+        INSERT INTO executions (
+            order_id, code, name, kiwoom_order_no, order_status,
+            order_type_raw, quantity, price, unfilled_quantity,
+            execution_price, execution_quantity, execution_time, raw_data
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """
+
+        with get_connection() as conn:
+            cursor = conn.execute(
+                sql,
+                (
+                    order_id,
+                    code,
+                    name,
+                    kiwoom_order_no,
+                    order_status,
+                    order_type_raw,
+                    quantity,
+                    price,
+                    unfilled_quantity,
+                    execution_price,
+                    execution_quantity,
+                    execution_time,
+                    raw_data,
+                ),
+            )
+            conn.commit()
+            return cursor.lastrowid
+
     def save_notification(self, channel, title, message, status="PENDING"):
         sql = """
         INSERT INTO notifications (channel, title, message, status)

@@ -1,4 +1,6 @@
-from PyQt5.QtCore import QEventLoop
+import json
+
+from PyQt5.QtCore import QEventLoop, QTimer
 from PyQt5.QAxContainer import QAxWidget
 
 
@@ -17,16 +19,16 @@ class KiwoomAPI:
 
         self.login_loop = None
         self.tr_loop = None
+        self.order_loop = None
+
         self.tr_data = {}
+        self.last_chejan_data = {}
 
         self.ocx.OnEventConnect.connect(self._on_event_connect)
         self.ocx.OnReceiveTrData.connect(self._on_receive_tr_data)
+        self.ocx.OnReceiveChejanData.connect(self._on_receive_chejan_data)
 
     def login(self):
-        """
-        키움 OpenAPI+ 로그인 창을 띄운다.
-        로그인 완료 전까지 이벤트 루프에서 대기한다.
-        """
         self.login_loop = QEventLoop()
 
         result = self.ocx.dynamicCall("CommConnect()")
@@ -37,10 +39,6 @@ class KiwoomAPI:
         self.login_loop.exec_()
 
     def _on_event_connect(self, err_code):
-        """
-        로그인 결과 이벤트.
-        err_code == 0이면 성공.
-        """
         if err_code == 0:
             print("[Kiwoom] 로그인 성공")
         else:
@@ -49,28 +47,27 @@ class KiwoomAPI:
         if self.login_loop is not None:
             self.login_loop.exit()
 
+    def get_login_info(self, tag):
+        value = self.ocx.dynamicCall("GetLoginInfo(QString)", tag)
+        return str(value).strip()
+
+    def get_account_list(self):
+        raw = self.get_login_info("ACCNO")
+        accounts = [acc for acc in raw.split(";") if acc]
+        return accounts
+
+    def get_server_gubun(self):
+        """
+        일반적으로 모의투자 서버는 '1'로 구분된다.
+        실전 서버는 빈 문자열 또는 다른 값으로 올 수 있다.
+        """
+        return self.get_login_info("GetServerGubun")
+
     def get_stock_name(self, code):
-        """
-        종목코드로 종목명 조회.
-        예: 005930 -> 삼성전자
-        """
         name = self.ocx.dynamicCall("GetMasterCodeName(QString)", code)
         return str(name).strip()
 
     def get_current_price(self, code):
-        """
-        opt10001: 주식기본정보요청
-
-        반환 예시:
-        {
-            "code": "005930",
-            "name": "삼성전자",
-            "current_price": 73600,
-            "volume": 12345678,
-            "raw_current_price": "+73600",
-            "raw_volume": "12345678"
-        }
-        """
         self.tr_data = {}
 
         self.ocx.dynamicCall("SetInputValue(QString, QString)", "종목코드", code)
@@ -107,6 +104,79 @@ class KiwoomAPI:
             "raw_volume": raw_volume,
         }
 
+    def send_market_buy_order(self, account_no, code, quantity):
+        """
+        시장가 매수 주문.
+        order_type=1: 신규매수
+        hoga_gb='03': 시장가
+        price=0
+        """
+        return self.send_order(
+            rqname="v3_시장가매수",
+            screen_no="2000",
+            account_no=account_no,
+            order_type=1,
+            code=code,
+            quantity=quantity,
+            price=0,
+            hoga_gb="03",
+            org_order_no="",
+        )
+
+    def send_order(
+        self,
+        rqname,
+        screen_no,
+        account_no,
+        order_type,
+        code,
+        quantity,
+        price,
+        hoga_gb,
+        org_order_no="",
+        wait_ms=10000,
+    ):
+        self.last_chejan_data = {}
+
+        result = self.ocx.dynamicCall(
+            "SendOrder(QString, QString, QString, int, QString, int, int, QString, QString)",
+            [
+                rqname,
+                screen_no,
+                account_no,
+                order_type,
+                code,
+                quantity,
+                price,
+                hoga_gb,
+                org_order_no,
+            ],
+        )
+
+        if result != 0:
+            return {
+                "success": False,
+                "result_code": result,
+                "message": f"SendOrder 호출 실패: result={result}",
+                "chejan": {},
+            }
+
+        self.order_loop = QEventLoop()
+
+        timer = QTimer()
+        timer.setSingleShot(True)
+        timer.timeout.connect(self.order_loop.exit)
+        timer.start(wait_ms)
+
+        self.order_loop.exec_()
+
+        return {
+            "success": True,
+            "result_code": result,
+            "message": "SendOrder 호출 성공",
+            "chejan": self.last_chejan_data,
+        }
+
     def _on_receive_tr_data(
         self,
         screen_no,
@@ -119,9 +189,6 @@ class KiwoomAPI:
         message,
         splm_msg,
     ):
-        """
-        TR 데이터 수신 이벤트.
-        """
         if rqname == "주식기본정보요청":
             current_price = self.ocx.dynamicCall(
                 "GetCommData(QString, QString, int, QString)",
@@ -147,11 +214,56 @@ class KiwoomAPI:
         if self.tr_loop is not None:
             self.tr_loop.exit()
 
+    def _on_receive_chejan_data(self, gubun, item_cnt, fid_list):
+        """
+        주문/체결 이벤트 수신.
+
+        주요 FID:
+        9203 주문번호
+        9001 종목코드
+        302  종목명
+        900  주문수량
+        901  주문가격
+        902  미체결수량
+        905  주문구분
+        908  주문/체결시간
+        910  체결가
+        911  체결량
+        """
+        data = {
+            "gubun": str(gubun),
+            "item_cnt": str(item_cnt),
+            "fid_list": str(fid_list),
+            "주문번호": self._get_chejan_data(9203),
+            "종목코드": self._clean_code(self._get_chejan_data(9001)),
+            "종목명": self._get_chejan_data(302),
+            "주문수량": self._to_positive_int(self._get_chejan_data(900)),
+            "주문가격": self._to_positive_int(self._get_chejan_data(901)),
+            "미체결수량": self._to_positive_int(self._get_chejan_data(902)),
+            "주문구분": self._get_chejan_data(905),
+            "주문체결시간": self._get_chejan_data(908),
+            "체결가": self._to_positive_int(self._get_chejan_data(910)),
+            "체결량": self._to_positive_int(self._get_chejan_data(911)),
+        }
+
+        self.last_chejan_data = data
+
+        print("[Kiwoom] Chejan 수신")
+        print(json.dumps(data, ensure_ascii=False, indent=2))
+
+        if self.order_loop is not None:
+            self.order_loop.exit()
+
+    def _get_chejan_data(self, fid):
+        value = self.ocx.dynamicCall("GetChejanData(int)", fid)
+        return str(value).strip()
+
+    def _clean_code(self, code):
+        if code is None:
+            return None
+        return str(code).strip().replace("A", "")
+
     def _to_positive_int(self, value):
-        """
-        키움 데이터는 +73600, -73600, 73,600 같은 문자열로 올 수 있다.
-        현재가와 거래량 저장용으로 부호와 콤마를 제거한다.
-        """
         if value is None:
             return None
 

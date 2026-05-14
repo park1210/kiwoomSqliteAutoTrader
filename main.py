@@ -23,6 +23,8 @@ def main():
             engine.run_v1_simulation()
         elif RUN_VERSION == "v2":
             engine.run_v2_kiwoom_snapshot()
+        elif RUN_VERSION == "v3":
+            engine.run_v3_paper_order_test()
         else:
             raise ValueError(f"알 수 없는 RUN_VERSION: {RUN_VERSION}")
 

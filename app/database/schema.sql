@@ -19,6 +19,17 @@ CREATE TABLE IF NOT EXISTS price_minute (
     UNIQUE(code, datetime)
 );
 
+CREATE TABLE IF NOT EXISTS price_snapshot (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    code TEXT NOT NULL,
+    name TEXT,
+    current_price INTEGER,
+    volume INTEGER,
+    raw_current_price TEXT,
+    raw_volume TEXT,
+    captured_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE TABLE IF NOT EXISTS signals (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     code TEXT NOT NULL,
@@ -27,6 +38,50 @@ CREATE TABLE IF NOT EXISTS signals (
     price INTEGER,
     reason TEXT,
     created_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS orders (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    code TEXT NOT NULL,
+    name TEXT,
+    account_no TEXT,
+    order_type TEXT NOT NULL,
+    quantity INTEGER NOT NULL,
+    price INTEGER DEFAULT 0,
+    hoga_gb TEXT,
+    status TEXT DEFAULT 'REQUESTED',
+    kiwoom_order_no TEXT,
+    reason TEXT,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS executions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    order_id INTEGER,
+    code TEXT,
+    name TEXT,
+    kiwoom_order_no TEXT,
+    order_status TEXT,
+    order_type_raw TEXT,
+    quantity INTEGER,
+    price INTEGER,
+    unfilled_quantity INTEGER,
+    execution_price INTEGER,
+    execution_quantity INTEGER,
+    execution_time TEXT,
+    raw_data TEXT,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(order_id) REFERENCES orders(id)
+);
+
+CREATE TABLE IF NOT EXISTS positions (
+    code TEXT PRIMARY KEY,
+    name TEXT,
+    quantity INTEGER DEFAULT 0,
+    avg_price INTEGER DEFAULT 0,
+    current_price INTEGER,
+    updated_at TEXT DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS notifications (
@@ -45,15 +100,4 @@ CREATE TABLE IF NOT EXISTS system_logs (
     message TEXT NOT NULL,
     detail TEXT,
     created_at TEXT DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE TABLE IF NOT EXISTS price_snapshot (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    code TEXT NOT NULL,
-    name TEXT,
-    current_price INTEGER,
-    volume INTEGER,
-    raw_current_price TEXT,
-    raw_volume TEXT,
-    captured_at TEXT DEFAULT CURRENT_TIMESTAMP
 );

@@ -10,21 +10,6 @@ class TradingEngine:
         self.notifier = ConsoleNotifier()
 
     def run_v1_simulation(self):
-        """
-        v1 실행 흐름:
-        1. 임시 종목 등록
-        2. 임시 5분봉 데이터 생성
-        3. DB 저장
-        4. DB에서 다시 조회
-        5. 이동평균 전략 실행
-        6. 신호 저장
-        7. 콘솔 알림
-
-        주의:
-        v1은 pandas 기반 MovingAverageStrategy를 사용한다.
-        현재 v2 환경에서는 pandas를 제거했으므로,
-        RUN_VERSION="v1"로 실행하면 pandas가 필요하다.
-        """
         from app.strategy.moving_average_strategy import MovingAverageStrategy
         from config import LONG_WINDOW, SHORT_WINDOW
 
@@ -77,16 +62,6 @@ class TradingEngine:
         self.notifier.send(title, message)
 
     def run_v2_kiwoom_snapshot(self):
-        """
-        v2 실행 흐름:
-        1. 키움 OpenAPI+ ActiveX 생성
-        2. 로그인
-        3. 삼성전자 종목명 조회
-        4. 삼성전자 현재가 조회
-        5. stocks 테이블 저장
-        6. price_snapshot 테이블 저장
-        7. 콘솔 알림
-        """
         from app.kiwoom.kiwoom_api import KiwoomAPI
 
         code = "005930"
@@ -138,6 +113,88 @@ class TradingEngine:
         )
 
         self.notifier.send(title, message)
+
+    def run_v3_paper_order_test(self):
+        from app.kiwoom.kiwoom_api import KiwoomAPI
+        from app.trading.order_manager import OrderManager
+        from config import ENABLE_ORDER, TEST_ORDER_CODE, TEST_ORDER_QTY
+
+        self.notifier.send(
+            title="v3 모의투자 주문 테스트 시작",
+            message=(
+                "키움 OpenAPI+ 로그인 창이 뜨면 로그인하세요.\n"
+                "반드시 모의투자 서버로 로그인하세요.\n"
+                f"현재 ENABLE_ORDER={ENABLE_ORDER}"
+            ),
+        )
+
+        kiwoom_api = KiwoomAPI()
+        kiwoom_api.login()
+
+        accounts = kiwoom_api.get_account_list()
+        server_gubun = kiwoom_api.get_server_gubun()
+
+        if not accounts:
+            raise RuntimeError("계좌번호를 가져오지 못했습니다.")
+
+        account_no = accounts[0]
+
+        self.notifier.send(
+            title="계좌/서버 확인",
+            message=(
+                f"계좌번호: {account_no}\n"
+                f"server_gubun: {server_gubun!r}\n"
+                "server_gubun이 '1'이면 일반적으로 모의투자 서버입니다."
+            ),
+        )
+
+        snapshot = kiwoom_api.get_current_price(TEST_ORDER_CODE)
+
+        self.repository.upsert_stock(
+            code=snapshot["code"],
+            name=snapshot["name"],
+            market="KOSPI",
+        )
+
+        snapshot_id = self.repository.save_price_snapshot(
+            code=snapshot["code"],
+            name=snapshot["name"],
+            current_price=snapshot["current_price"],
+            volume=snapshot["volume"],
+            raw_current_price=snapshot["raw_current_price"],
+            raw_volume=snapshot["raw_volume"],
+        )
+
+        self.notifier.send(
+            title="주문 전 현재가 확인",
+            message=(
+                f"종목코드: {snapshot['code']}\n"
+                f"종목명: {snapshot['name']}\n"
+                f"현재가: {snapshot['current_price']}\n"
+                f"수량: {TEST_ORDER_QTY}\n"
+                f"DB snapshot_id: {snapshot_id}"
+            ),
+        )
+
+        order_manager = OrderManager(
+            repository=self.repository,
+            notifier=self.notifier,
+        )
+
+        result = order_manager.paper_market_buy(
+            kiwoom_api=kiwoom_api,
+            account_no=account_no,
+            code=snapshot["code"],
+            name=snapshot["name"],
+            quantity=TEST_ORDER_QTY,
+            current_price=snapshot["current_price"],
+        )
+
+        self.repository.save_system_log(
+            level="INFO",
+            message="v3 paper order test finished",
+            detail=str(result),
+        )
 
     def _create_sample_minute_data(self):
         start_time = datetime(2026, 5, 8, 9, 0, 0)
