@@ -29,7 +29,7 @@ STRATEGY_NAME = "MovingAverageStrategy"
 
 # 실제 SendOrder 호출 여부
 # 처음 v4 테스트는 False 권장
-ENABLE_ORDER = False
+ENABLE_ORDER = True
 
 # 실전 주문 허용 여부
 ALLOW_LIVE_ORDER = False
