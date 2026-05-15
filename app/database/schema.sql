@@ -81,7 +81,37 @@ CREATE TABLE IF NOT EXISTS positions (
     quantity INTEGER DEFAULT 0,
     avg_price INTEGER DEFAULT 0,
     current_price INTEGER,
+    eval_amount INTEGER,
+    profit_loss INTEGER,
+    profit_rate REAL,
     updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS unfilled_orders (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    account_no TEXT,
+    code TEXT,
+    name TEXT,
+    kiwoom_order_no TEXT,
+    order_type TEXT,
+    order_price INTEGER,
+    order_quantity INTEGER,
+    unfilled_quantity INTEGER,
+    current_price INTEGER,
+    raw_data TEXT,
+    captured_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS account_snapshots (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    account_no TEXT,
+    cash INTEGER,
+    total_buy_amount INTEGER,
+    total_eval_amount INTEGER,
+    total_profit_loss INTEGER,
+    total_profit_rate REAL,
+    raw_data TEXT,
+    captured_at TEXT DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS notifications (

@@ -25,6 +25,10 @@ def main():
             engine.run_v2_kiwoom_snapshot()
         elif RUN_VERSION == "v3":
             engine.run_v3_paper_order_test()
+        elif RUN_VERSION == "v4":
+            engine.run_v4_order_position_tracking()
+        elif RUN_VERSION == "password":
+            engine.run_show_account_password_window()
         else:
             raise ValueError(f"알 수 없는 RUN_VERSION: {RUN_VERSION}")
 

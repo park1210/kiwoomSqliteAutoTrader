@@ -1,3 +1,5 @@
+import json
+
 from app.database.db import get_connection
 
 
@@ -212,6 +214,128 @@ class TradingRepository:
             )
             conn.commit()
             return cursor.lastrowid
+
+    def save_account_snapshot(self, account_no, account_summary):
+        sql = """
+        INSERT INTO account_snapshots (
+            account_no, cash, total_buy_amount, total_eval_amount,
+            total_profit_loss, total_profit_rate, raw_data
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+        """
+
+        with get_connection() as conn:
+            cursor = conn.execute(
+                sql,
+                (
+                    account_no,
+                    account_summary.get("cash"),
+                    account_summary.get("total_buy_amount"),
+                    account_summary.get("total_eval_amount"),
+                    account_summary.get("total_profit_loss"),
+                    account_summary.get("total_profit_rate"),
+                    json.dumps(account_summary, ensure_ascii=False),
+                ),
+            )
+            conn.commit()
+            return cursor.lastrowid
+
+    def replace_positions(self, positions):
+        with get_connection() as conn:
+            conn.execute("DELETE FROM positions")
+
+            sql = """
+            INSERT INTO positions (
+                code, name, quantity, avg_price, current_price,
+                eval_amount, profit_loss, profit_rate
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """
+
+            values = [
+                (
+                    p.get("code"),
+                    p.get("name"),
+                    p.get("quantity"),
+                    p.get("avg_price"),
+                    p.get("current_price"),
+                    p.get("eval_amount"),
+                    p.get("profit_loss"),
+                    p.get("profit_rate"),
+                )
+                for p in positions
+            ]
+
+            if values:
+                conn.executemany(sql, values)
+
+            conn.commit()
+
+    def get_position_by_code(self, code):
+        sql = """
+        SELECT code, name, quantity, avg_price, current_price,
+               eval_amount, profit_loss, profit_rate, updated_at
+        FROM positions
+        WHERE code = ?
+        """
+
+        with get_connection() as conn:
+            row = conn.execute(sql, (code,)).fetchone()
+
+        return dict(row) if row else None
+
+    def replace_unfilled_orders(self, account_no, unfilled_orders):
+        with get_connection() as conn:
+            conn.execute(
+                "DELETE FROM unfilled_orders WHERE account_no = ?",
+                (account_no,),
+            )
+
+            sql = """
+            INSERT INTO unfilled_orders (
+                account_no, code, name, kiwoom_order_no, order_type,
+                order_price, order_quantity, unfilled_quantity,
+                current_price, raw_data
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """
+
+            values = [
+                (
+                    account_no,
+                    o.get("code"),
+                    o.get("name"),
+                    o.get("kiwoom_order_no"),
+                    o.get("order_type"),
+                    o.get("order_price"),
+                    o.get("order_quantity"),
+                    o.get("unfilled_quantity"),
+                    o.get("current_price"),
+                    json.dumps(o, ensure_ascii=False),
+                )
+                for o in unfilled_orders
+            ]
+
+            if values:
+                conn.executemany(sql, values)
+
+            conn.commit()
+
+    def get_unfilled_order_by_code(self, account_no, code):
+        sql = """
+        SELECT *
+        FROM unfilled_orders
+        WHERE account_no = ?
+          AND code = ?
+          AND COALESCE(unfilled_quantity, 0) > 0
+        ORDER BY id DESC
+        LIMIT 1
+        """
+
+        with get_connection() as conn:
+            row = conn.execute(sql, (account_no, code)).fetchone()
+
+        return dict(row) if row else None
 
     def save_notification(self, channel, title, message, status="PENDING"):
         sql = """

@@ -53,15 +53,17 @@ class KiwoomAPI:
 
     def get_account_list(self):
         raw = self.get_login_info("ACCNO")
-        accounts = [acc for acc in raw.split(";") if acc]
-        return accounts
+        return [acc for acc in raw.split(";") if acc]
 
     def get_server_gubun(self):
-        """
-        일반적으로 모의투자 서버는 '1'로 구분된다.
-        실전 서버는 빈 문자열 또는 다른 값으로 올 수 있다.
-        """
         return self.get_login_info("GetServerGubun")
+
+    def show_account_password_window(self):
+        self.ocx.dynamicCall(
+            "KOA_Functions(QString, QString)",
+            "ShowAccountWindow",
+            "",
+        )
 
     def get_stock_name(self, code):
         name = self.ocx.dynamicCall("GetMasterCodeName(QString)", code)
@@ -92,28 +94,76 @@ class KiwoomAPI:
         raw_current_price = self.tr_data.get("현재가", "")
         raw_volume = self.tr_data.get("거래량", "")
 
-        current_price = self._to_positive_int(raw_current_price)
-        volume = self._to_positive_int(raw_volume)
-
         return {
             "code": code,
             "name": name,
-            "current_price": current_price,
-            "volume": volume,
+            "current_price": self._to_positive_int(raw_current_price),
+            "volume": self._to_positive_int(raw_volume),
             "raw_current_price": raw_current_price,
             "raw_volume": raw_volume,
         }
 
+    def get_account_balance(self, account_no):
+        """
+        opw00018: 계좌평가잔고내역요청
+        """
+        self.tr_data = {}
+
+        self.ocx.dynamicCall("SetInputValue(QString, QString)", "계좌번호", account_no)
+        self.ocx.dynamicCall("SetInputValue(QString, QString)", "비밀번호", "")
+        self.ocx.dynamicCall("SetInputValue(QString, QString)", "비밀번호입력매체구분", "00")
+        self.ocx.dynamicCall("SetInputValue(QString, QString)", "조회구분", "2")
+
+        self.tr_loop = QEventLoop()
+
+        result = self.ocx.dynamicCall(
+            "CommRqData(QString, QString, int, QString)",
+            "계좌평가잔고내역요청",
+            "opw00018",
+            0,
+            "2001",
+        )
+
+        if result != 0:
+            raise RuntimeError(f"계좌평가잔고내역요청 실패: result={result}")
+
+        self.tr_loop.exec_()
+
+        return self.tr_data
+
+    def get_unfilled_orders(self, account_no):
+        """
+        opt10075: 미체결요청
+        """
+        self.tr_data = {}
+
+        self.ocx.dynamicCall("SetInputValue(QString, QString)", "계좌번호", account_no)
+        self.ocx.dynamicCall("SetInputValue(QString, QString)", "전체종목구분", "0")
+        self.ocx.dynamicCall("SetInputValue(QString, QString)", "매매구분", "0")
+        self.ocx.dynamicCall("SetInputValue(QString, QString)", "종목코드", "")
+        self.ocx.dynamicCall("SetInputValue(QString, QString)", "체결구분", "1")
+
+        self.tr_loop = QEventLoop()
+
+        result = self.ocx.dynamicCall(
+            "CommRqData(QString, QString, int, QString)",
+            "미체결요청",
+            "opt10075",
+            0,
+            "2002",
+        )
+
+        if result != 0:
+            raise RuntimeError(f"미체결요청 실패: result={result}")
+
+        self.tr_loop.exec_()
+
+        return self.tr_data.get("unfilled_orders", [])
+
     def send_market_buy_order(self, account_no, code, quantity):
-        """
-        시장가 매수 주문.
-        order_type=1: 신규매수
-        hoga_gb='03': 시장가
-        price=0
-        """
         return self.send_order(
-            rqname="v3_시장가매수",
-            screen_no="2000",
+            rqname="v4_시장가매수",
+            screen_no="3000",
             account_no=account_no,
             order_type=1,
             code=code,
@@ -157,7 +207,10 @@ class KiwoomAPI:
             return {
                 "success": False,
                 "result_code": result,
-                "message": f"SendOrder 호출 실패: result={result}",
+                "message": (
+                    f"SendOrder 호출 실패: result={result}, "
+                    f"reason={self._get_order_error_message(result)}"
+                ),
                 "chejan": {},
             }
 
@@ -190,46 +243,115 @@ class KiwoomAPI:
         splm_msg,
     ):
         if rqname == "주식기본정보요청":
-            current_price = self.ocx.dynamicCall(
-                "GetCommData(QString, QString, int, QString)",
-                trcode,
-                rqname,
-                0,
-                "현재가",
-            ).strip()
-
-            volume = self.ocx.dynamicCall(
-                "GetCommData(QString, QString, int, QString)",
-                trcode,
-                rqname,
-                0,
-                "거래량",
-            ).strip()
+            current_price = self._get_comm_data(trcode, rqname, 0, "현재가")
+            volume = self._get_comm_data(trcode, rqname, 0, "거래량")
 
             self.tr_data = {
                 "현재가": current_price,
                 "거래량": volume,
             }
 
+        elif rqname == "계좌평가잔고내역요청":
+            self.tr_data = self._parse_account_balance(trcode, rqname)
+
+        elif rqname == "미체결요청":
+            self.tr_data = {
+                "unfilled_orders": self._parse_unfilled_orders(trcode, rqname)
+            }
+
         if self.tr_loop is not None:
             self.tr_loop.exit()
 
-    def _on_receive_chejan_data(self, gubun, item_cnt, fid_list):
-        """
-        주문/체결 이벤트 수신.
+    def _parse_account_balance(self, trcode, rqname):
+        summary = {
+            "cash": None,
+            "total_buy_amount": self._to_signed_int(
+                self._get_comm_data(trcode, rqname, 0, "총매입금액")
+            ),
+            "total_eval_amount": self._to_signed_int(
+                self._get_comm_data(trcode, rqname, 0, "총평가금액")
+            ),
+            "total_profit_loss": self._to_signed_int(
+                self._get_comm_data(trcode, rqname, 0, "총평가손익금액")
+            ),
+            "total_profit_rate": self._to_float(
+                self._get_comm_data(trcode, rqname, 0, "총수익률(%)")
+            ),
+        }
 
-        주요 FID:
-        9203 주문번호
-        9001 종목코드
-        302  종목명
-        900  주문수량
-        901  주문가격
-        902  미체결수량
-        905  주문구분
-        908  주문/체결시간
-        910  체결가
-        911  체결량
-        """
+        count = self.ocx.dynamicCall(
+            "GetRepeatCnt(QString, QString)",
+            trcode,
+            rqname,
+        )
+
+        positions = []
+
+        for i in range(count):
+            code = self._clean_code(self._get_comm_data(trcode, rqname, i, "종목번호"))
+            name = self._get_comm_data(trcode, rqname, i, "종목명")
+            quantity = self._to_signed_int(self._get_comm_data(trcode, rqname, i, "보유수량"))
+            avg_price = self._to_signed_int(self._get_comm_data(trcode, rqname, i, "매입가"))
+            current_price = self._to_positive_int(self._get_comm_data(trcode, rqname, i, "현재가"))
+            eval_amount = self._to_signed_int(self._get_comm_data(trcode, rqname, i, "평가금액"))
+            profit_loss = self._to_signed_int(self._get_comm_data(trcode, rqname, i, "평가손익"))
+            profit_rate = self._to_float(self._get_comm_data(trcode, rqname, i, "수익률(%)"))
+
+            if code:
+                positions.append(
+                    {
+                        "code": code,
+                        "name": name,
+                        "quantity": quantity,
+                        "avg_price": avg_price,
+                        "current_price": current_price,
+                        "eval_amount": eval_amount,
+                        "profit_loss": profit_loss,
+                        "profit_rate": profit_rate,
+                    }
+                )
+
+        return {
+            "summary": summary,
+            "positions": positions,
+        }
+
+    def _parse_unfilled_orders(self, trcode, rqname):
+        count = self.ocx.dynamicCall(
+            "GetRepeatCnt(QString, QString)",
+            trcode,
+            rqname,
+        )
+
+        orders = []
+
+        for i in range(count):
+            code = self._clean_code(self._get_comm_data(trcode, rqname, i, "종목코드"))
+            name = self._get_comm_data(trcode, rqname, i, "종목명")
+            kiwoom_order_no = self._get_comm_data(trcode, rqname, i, "주문번호")
+            order_type = self._get_comm_data(trcode, rqname, i, "주문구분")
+            order_price = self._to_positive_int(self._get_comm_data(trcode, rqname, i, "주문가격"))
+            order_quantity = self._to_positive_int(self._get_comm_data(trcode, rqname, i, "주문수량"))
+            unfilled_quantity = self._to_positive_int(self._get_comm_data(trcode, rqname, i, "미체결수량"))
+            current_price = self._to_positive_int(self._get_comm_data(trcode, rqname, i, "현재가"))
+
+            if code:
+                orders.append(
+                    {
+                        "code": code,
+                        "name": name,
+                        "kiwoom_order_no": kiwoom_order_no,
+                        "order_type": order_type,
+                        "order_price": order_price,
+                        "order_quantity": order_quantity,
+                        "unfilled_quantity": unfilled_quantity,
+                        "current_price": current_price,
+                    }
+                )
+
+        return orders
+
+    def _on_receive_chejan_data(self, gubun, item_cnt, fid_list):
         data = {
             "gubun": str(gubun),
             "item_cnt": str(item_cnt),
@@ -254,6 +376,16 @@ class KiwoomAPI:
         if self.order_loop is not None:
             self.order_loop.exit()
 
+    def _get_comm_data(self, trcode, rqname, index, item):
+        value = self.ocx.dynamicCall(
+            "GetCommData(QString, QString, int, QString)",
+            trcode,
+            rqname,
+            index,
+            item,
+        )
+        return str(value).strip()
+
     def _get_chejan_data(self, fid):
         value = self.ocx.dynamicCall("GetChejanData(int)", fid)
         return str(value).strip()
@@ -264,13 +396,18 @@ class KiwoomAPI:
         return str(code).strip().replace("A", "")
 
     def _to_positive_int(self, value):
+        number = self._to_signed_int(value)
+        if number is None:
+            return None
+        return abs(number)
+
+    def _to_signed_int(self, value):
         if value is None:
             return None
 
         text = str(value).strip()
         text = text.replace(",", "")
         text = text.replace("+", "")
-        text = text.replace("-", "")
 
         if text == "":
             return None
@@ -279,3 +416,36 @@ class KiwoomAPI:
             return int(text)
         except ValueError:
             return None
+
+    def _to_float(self, value):
+        if value is None:
+            return None
+
+        text = str(value).strip()
+        text = text.replace(",", "")
+        text = text.replace("+", "")
+
+        if text == "":
+            return None
+
+        try:
+            return float(text)
+        except ValueError:
+            return None
+
+    def _get_order_error_message(self, result_code):
+        messages = {
+            0: "정상",
+            -10: "실패",
+            -100: "사용자정보교환 실패",
+            -101: "서버 접속 실패",
+            -102: "버전처리 실패",
+            -200: "시세조회 과부하",
+            -201: "전문작성 초기화 실패",
+            -300: "입력값 오류",
+            -301: "계좌비밀번호 미등록 또는 입력 필요",
+            -302: "타인계좌 사용 오류",
+            -308: "주문전송 과부하",
+        }
+
+        return messages.get(result_code, f"알 수 없는 오류 코드: {result_code}")

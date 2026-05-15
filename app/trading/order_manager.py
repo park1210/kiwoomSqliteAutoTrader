@@ -1,13 +1,18 @@
 import json
 
 from app.trading.risk_manager import RiskManager
-from config import MODE
+from config import (
+    BLOCK_IF_ALREADY_HOLDING,
+    BLOCK_IF_UNFILLED_ORDER_EXISTS,
+    MODE,
+)
 
 
 class OrderManager:
-    def __init__(self, repository, notifier):
+    def __init__(self, repository, notifier, position_manager=None):
         self.repository = repository
         self.notifier = notifier
+        self.position_manager = position_manager
         self.risk_manager = RiskManager()
 
     def paper_market_buy(
@@ -27,13 +32,7 @@ class OrderManager:
         )
 
         if not ok:
-            self._notify_blocked_order(code, name, reason)
-            return {
-                "ordered": False,
-                "reason": reason,
-                "order_id": None,
-                "send_result": None,
-            }
+            return self._blocked(code, name, reason)
 
         ok, reason = self.risk_manager.validate_buy_amount(
             quantity=quantity,
@@ -41,13 +40,30 @@ class OrderManager:
         )
 
         if not ok:
-            self._notify_blocked_order(code, name, reason)
-            return {
-                "ordered": False,
-                "reason": reason,
-                "order_id": None,
-                "send_result": None,
-            }
+            return self._blocked(code, name, reason)
+
+        if self.position_manager is not None and BLOCK_IF_ALREADY_HOLDING:
+            is_holding, position = self.position_manager.is_holding(code)
+
+            if is_holding:
+                return self._blocked(
+                    code,
+                    name,
+                    f"이미 보유 중인 종목이므로 중복 매수 차단: {position}",
+                )
+
+        if self.position_manager is not None and BLOCK_IF_UNFILLED_ORDER_EXISTS:
+            has_unfilled, unfilled = self.position_manager.has_unfilled_order(
+                account_no=account_no,
+                code=code,
+            )
+
+            if has_unfilled:
+                return self._blocked(
+                    code,
+                    name,
+                    f"미체결 주문이 존재하여 추가 주문 차단: {unfilled}",
+                )
 
         order_id = self.repository.save_order(
             code=code,
@@ -57,7 +73,7 @@ class OrderManager:
             quantity=quantity,
             price=0,
             hoga_gb="03",
-            reason="v3 모의투자 시장가 매수 테스트",
+            reason="v4 모의투자 시장가 매수 테스트",
             status="REQUESTED",
         )
 
@@ -138,7 +154,7 @@ class OrderManager:
             "send_result": send_result,
         }
 
-    def _notify_blocked_order(self, code, name, reason):
+    def _blocked(self, code, name, reason):
         self.notifier.send(
             title="주문 차단",
             message=(
@@ -147,3 +163,10 @@ class OrderManager:
                 f"차단 사유: {reason}"
             ),
         )
+
+        return {
+            "ordered": False,
+            "reason": reason,
+            "order_id": None,
+            "send_result": None,
+        }
