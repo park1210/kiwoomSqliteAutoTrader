@@ -387,6 +387,25 @@ class KiwoomAPI:
             hoga_gb="03",
             org_order_no="",
         )
+    
+    def send_market_sell_order(self, account_no, code, quantity):
+        """
+        시장가 매도 주문.
+        order_type=2: 신규매도
+        hoga_gb='03': 시장가
+        price=0
+        """
+        return self.send_order(
+            rqname="v7_시장가매도",
+            screen_no="3100",
+            account_no=account_no,
+            order_type=2,
+            code=code,
+            quantity=quantity,
+            price=0,
+            hoga_gb="03",
+            org_order_no="",
+        )
 
     def send_order(
         self,

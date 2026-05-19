@@ -436,3 +436,50 @@ class TradingRepository:
             )
             conn.commit()
             return cursor.lastrowid
+
+    def save_sell_decision(
+        self,
+        code,
+        name,
+        quantity,
+        avg_price,
+        current_price,
+        eval_amount,
+        profit_loss,
+        profit_rate,
+        decision,
+        reason,
+        ordered=False,
+        order_id=None,
+        raw_data=None,
+    ):
+        sql = """
+        INSERT INTO sell_decisions (
+            code, name, quantity, avg_price, current_price,
+            eval_amount, profit_loss, profit_rate,
+            decision, reason, ordered, order_id, raw_data
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """
+
+        with get_connection() as conn:
+            cursor = conn.execute(
+                sql,
+                (
+                    code,
+                    name,
+                    quantity,
+                    avg_price,
+                    current_price,
+                    eval_amount,
+                    profit_loss,
+                    profit_rate,
+                    decision,
+                    reason,
+                    1 if ordered else 0,
+                    order_id,
+                    raw_data,
+                ),
+            )
+            conn.commit()
+            return cursor.lastrowid

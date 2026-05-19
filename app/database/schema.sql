@@ -160,3 +160,21 @@ CREATE TABLE IF NOT EXISTS condition_trade_decisions (
     raw_data TEXT,
     created_at TEXT DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE TABLE IF NOT EXISTS sell_decisions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    code TEXT NOT NULL,
+    name TEXT,
+    quantity INTEGER,
+    avg_price INTEGER,
+    current_price INTEGER,
+    eval_amount INTEGER,
+    profit_loss INTEGER,
+    profit_rate REAL,
+    decision TEXT,
+    reason TEXT,
+    ordered INTEGER DEFAULT 0,
+    order_id INTEGER,
+    raw_data TEXT,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+);

@@ -153,6 +153,118 @@ class OrderManager:
             "order_id": order_id,
             "send_result": send_result,
         }
+    
+    def paper_market_sell(
+        self,
+        kiwoom_api,
+        account_no,
+        code,
+        name,
+        quantity,
+        reason,
+    ):
+        server_gubun = kiwoom_api.get_server_gubun()
+
+        ok, env_reason = self.risk_manager.validate_order_environment(
+            mode=MODE,
+            server_gubun=server_gubun,
+        )
+
+        if not ok:
+            return self._blocked(code, name, env_reason)
+
+        if quantity <= 0:
+            return self._blocked(code, name, f"매도 수량이 올바르지 않습니다: {quantity}")
+
+        order_id = self.repository.save_order(
+            code=code,
+            name=name,
+            account_no=account_no,
+            order_type="SELL",
+            quantity=quantity,
+            price=0,
+            hoga_gb="03",
+            reason=reason,
+            status="REQUESTED",
+        )
+
+        send_result = kiwoom_api.send_market_sell_order(
+            account_no=account_no,
+            code=code,
+            quantity=quantity,
+        )
+
+        if not send_result["success"]:
+            self.repository.update_order_status(
+                order_id=order_id,
+                status="FAILED",
+            )
+
+            self.notifier.send(
+                title="매도 주문 실패",
+                message=(
+                    f"종목코드: {code}\n"
+                    f"종목명: {name}\n"
+                    f"수량: {quantity}\n"
+                    f"사유: {send_result['message']}"
+                ),
+            )
+
+            return {
+                "ordered": False,
+                "reason": send_result["message"],
+                "order_id": order_id,
+                "send_result": send_result,
+            }
+
+        chejan = send_result.get("chejan", {})
+        kiwoom_order_no = chejan.get("주문번호")
+
+        self.repository.update_order_status(
+            order_id=order_id,
+            status="SUBMITTED",
+            kiwoom_order_no=kiwoom_order_no,
+        )
+
+        if chejan:
+            execution_id = self.repository.save_execution(
+                order_id=order_id,
+                code=chejan.get("종목코드") or code,
+                name=chejan.get("종목명") or name,
+                kiwoom_order_no=chejan.get("주문번호"),
+                order_status="CHEJAN_RECEIVED",
+                order_type_raw=chejan.get("주문구분"),
+                quantity=chejan.get("주문수량"),
+                price=chejan.get("주문가격"),
+                unfilled_quantity=chejan.get("미체결수량"),
+                execution_price=chejan.get("체결가"),
+                execution_quantity=chejan.get("체결량"),
+                execution_time=chejan.get("주문체결시간"),
+                raw_data=json.dumps(chejan, ensure_ascii=False),
+            )
+        else:
+            execution_id = None
+
+        self.notifier.send(
+            title="모의투자 매도 주문 요청 완료",
+            message=(
+                f"종목코드: {code}\n"
+                f"종목명: {name}\n"
+                f"수량: {quantity}\n"
+                f"주문방식: 시장가\n"
+                f"주문ID: {order_id}\n"
+                f"키움주문번호: {kiwoom_order_no}\n"
+                f"체결이벤트ID: {execution_id}\n"
+                f"SendOrder 결과: {send_result['message']}"
+            ),
+        )
+
+        return {
+            "ordered": True,
+            "reason": "매도 주문 요청 완료",
+            "order_id": order_id,
+            "send_result": send_result,
+        }
 
     def _blocked(self, code, name, reason):
         self.notifier.send(
