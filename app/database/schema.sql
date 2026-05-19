@@ -131,3 +131,16 @@ CREATE TABLE IF NOT EXISTS system_logs (
     detail TEXT,
     created_at TEXT DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE TABLE IF NOT EXISTS condition_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    condition_index INTEGER,
+    condition_name TEXT,
+    code TEXT,
+    name TEXT,
+    event_type TEXT,
+    event_type_name TEXT,
+    source TEXT,
+    raw_data TEXT,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+);

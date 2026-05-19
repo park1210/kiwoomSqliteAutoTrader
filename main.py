@@ -27,6 +27,8 @@ def main():
             engine.run_v3_paper_order_test()
         elif RUN_VERSION == "v4":
             engine.run_v4_order_position_tracking()
+        elif RUN_VERSION == "v5":
+            engine.run_v5_condition_search_test()
         elif RUN_VERSION == "password":
             engine.run_show_account_password_window()
         else:

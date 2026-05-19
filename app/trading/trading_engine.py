@@ -144,23 +144,19 @@ class TradingEngine:
             notifier=self.notifier,
         )
 
-        # 1. 주문 전 계좌/보유 종목 동기화
         position_manager.sync_account_state(
             kiwoom_api=kiwoom_api,
             account_no=account_no,
         )
 
-        # 2. 주문 전 미체결 주문 동기화
         position_manager.sync_unfilled_orders(
             kiwoom_api=kiwoom_api,
             account_no=account_no,
         )
 
-        # 3. 현재가 조회 및 저장
         snapshot = kiwoom_api.get_current_price(TEST_ORDER_CODE)
         self._save_snapshot_and_notify(snapshot)
 
-        # 4. 중복 보유/미체결 확인 후 주문
         order_manager = OrderManager(
             repository=self.repository,
             notifier=self.notifier,
@@ -176,7 +172,6 @@ class TradingEngine:
             current_price=snapshot["current_price"],
         )
 
-        # 5. 주문 후 계좌/미체결 재동기화
         position_manager.sync_account_state(
             kiwoom_api=kiwoom_api,
             account_no=account_no,
@@ -190,6 +185,43 @@ class TradingEngine:
         self.repository.save_system_log(
             level="INFO",
             message="v4 order position tracking finished",
+            detail=str(result),
+        )
+
+    def run_v5_condition_search_test(self):
+        from app.kiwoom.condition_manager import ConditionManager
+        from app.kiwoom.kiwoom_api import KiwoomAPI
+
+        self.notifier.send(
+            title="v5 조건검색 테스트 시작",
+            message=(
+                "키움 OpenAPI+ 로그인 창이 뜨면 로그인하세요.\n"
+                "조건검색식은 키움 HTS에서 미리 저장되어 있어야 합니다.\n"
+                "v5 기본 설정은 주문하지 않고 조건검색 이벤트만 저장합니다."
+            ),
+        )
+
+        kiwoom_api = KiwoomAPI()
+        kiwoom_api.login()
+
+        account_no = self._get_first_account(kiwoom_api)
+        self._notify_account_server(kiwoom_api, account_no)
+
+        condition_manager = ConditionManager(
+            repository=self.repository,
+            notifier=self.notifier,
+        )
+
+        condition = condition_manager.load_and_select_condition(kiwoom_api)
+
+        result = condition_manager.run_condition_watch(
+            kiwoom_api=kiwoom_api,
+            condition=condition,
+        )
+
+        self.repository.save_system_log(
+            level="INFO",
+            message="v5 condition search test finished",
             detail=str(result),
         )
 

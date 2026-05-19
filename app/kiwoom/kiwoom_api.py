@@ -21,12 +21,32 @@ class KiwoomAPI:
         self.tr_loop = None
         self.order_loop = None
 
+        self.condition_load_loop = None
+        self.condition_search_loop = None
+
         self.tr_data = {}
-        self.last_chejan_data = {}
+
+        # Chejan 이벤트 저장용
+        self.chejan_events = []
+        self.last_order_chejan_data = {}
+        self.last_fill_chejan_data = {}
+        self.last_balance_chejan_data = {}
+
+        # 조건검색 저장용
+        self.condition_initial_codes = []
+        self.condition_events = []
 
         self.ocx.OnEventConnect.connect(self._on_event_connect)
         self.ocx.OnReceiveTrData.connect(self._on_receive_tr_data)
         self.ocx.OnReceiveChejanData.connect(self._on_receive_chejan_data)
+
+        self.ocx.OnReceiveConditionVer.connect(self._on_receive_condition_ver)
+        self.ocx.OnReceiveTrCondition.connect(self._on_receive_tr_condition)
+        self.ocx.OnReceiveRealCondition.connect(self._on_receive_real_condition)
+
+    # ============================================================
+    # Login
+    # ============================================================
 
     def login(self):
         self.login_loop = QEventLoop()
@@ -47,6 +67,10 @@ class KiwoomAPI:
         if self.login_loop is not None:
             self.login_loop.exit()
 
+    # ============================================================
+    # Login info
+    # ============================================================
+
     def get_login_info(self, tag):
         value = self.ocx.dynamicCall("GetLoginInfo(QString)", tag)
         return str(value).strip()
@@ -64,6 +88,10 @@ class KiwoomAPI:
             "ShowAccountWindow",
             "",
         )
+
+    # ============================================================
+    # Stock basic info
+    # ============================================================
 
     def get_stock_name(self, code):
         name = self.ocx.dynamicCall("GetMasterCodeName(QString)", code)
@@ -103,10 +131,11 @@ class KiwoomAPI:
             "raw_volume": raw_volume,
         }
 
+    # ============================================================
+    # Account balance
+    # ============================================================
+
     def get_account_balance(self, account_no):
-        """
-        opw00018: 계좌평가잔고내역요청
-        """
         self.tr_data = {}
 
         self.ocx.dynamicCall("SetInputValue(QString, QString)", "계좌번호", account_no)
@@ -131,10 +160,11 @@ class KiwoomAPI:
 
         return self.tr_data
 
+    # ============================================================
+    # Unfilled orders
+    # ============================================================
+
     def get_unfilled_orders(self, account_no):
-        """
-        opt10075: 미체결요청
-        """
         self.tr_data = {}
 
         self.ocx.dynamicCall("SetInputValue(QString, QString)", "계좌번호", account_no)
@@ -159,6 +189,191 @@ class KiwoomAPI:
         self.tr_loop.exec_()
 
         return self.tr_data.get("unfilled_orders", [])
+
+    # ============================================================
+    # Condition search
+    # ============================================================
+
+    def load_conditions(self):
+        """
+        키움 서버에서 조건검색식 목록을 불러온다.
+        """
+        self.condition_load_loop = QEventLoop()
+
+        result = self.ocx.dynamicCall("GetConditionLoad()")
+
+        if result != 1:
+            raise RuntimeError(f"GetConditionLoad 실패: result={result}")
+
+        self.condition_load_loop.exec_()
+
+    def _on_receive_condition_ver(self, ret, msg):
+        print(f"[Kiwoom] 조건식 로딩 완료: ret={ret}, msg={msg}")
+
+        if self.condition_load_loop is not None:
+            self.condition_load_loop.exit()
+
+    def get_condition_list(self):
+        """
+        조건검색식 목록 반환.
+
+        원본 예:
+        '0^급등주;1^거래량급증;'
+        """
+        raw = self.ocx.dynamicCall("GetConditionNameList()")
+        raw = str(raw).strip()
+
+        conditions = []
+
+        if not raw:
+            return conditions
+
+        items = raw.split(";")
+
+        for item in items:
+            if not item:
+                continue
+
+            if "^" not in item:
+                continue
+
+            index_text, name = item.split("^", 1)
+
+            try:
+                index = int(index_text)
+            except ValueError:
+                continue
+
+            conditions.append(
+                {
+                    "index": index,
+                    "name": name.strip(),
+                }
+            )
+
+        return conditions
+
+    def send_condition(
+        self,
+        screen_no,
+        condition_name,
+        condition_index,
+        search_type=1,
+    ):
+        """
+        조건검색 실행.
+
+        search_type:
+        0 = 일반 조건검색
+        1 = 실시간 조건검색
+        """
+        self.condition_initial_codes = []
+        self.condition_events = []
+
+        self.condition_search_loop = QEventLoop()
+
+        result = self.ocx.dynamicCall(
+            "SendCondition(QString, QString, int, int)",
+            screen_no,
+            condition_name,
+            int(condition_index),
+            int(search_type),
+        )
+
+        if result != 1:
+            raise RuntimeError(
+                f"SendCondition 실패: result={result}, "
+                f"condition={condition_index}^{condition_name}"
+            )
+
+        self.condition_search_loop.exec_()
+
+        return self.condition_initial_codes
+
+    def stop_condition(
+        self,
+        screen_no,
+        condition_name,
+        condition_index,
+    ):
+        self.ocx.dynamicCall(
+            "SendConditionStop(QString, QString, int)",
+            screen_no,
+            condition_name,
+            int(condition_index),
+        )
+
+        print(f"[Kiwoom] 조건검색 중지: {condition_index}^{condition_name}")
+
+    def _on_receive_tr_condition(
+        self,
+        screen_no,
+        code_list,
+        condition_name,
+        condition_index,
+        next_,
+    ):
+        codes = [
+            code for code in str(code_list).split(";")
+            if code
+        ]
+
+        self.condition_initial_codes = codes
+
+        print(
+            f"[Kiwoom] 조건검색 초기 결과 수신: "
+            f"{condition_index}^{condition_name}, count={len(codes)}"
+        )
+
+        if self.condition_search_loop is not None:
+            self.condition_search_loop.exit()
+
+    def _on_receive_real_condition(
+        self,
+        code,
+        event_type,
+        condition_name,
+        condition_index,
+    ):
+        code = str(code).strip()
+        event_type = str(event_type).strip()
+        condition_name = str(condition_name).strip()
+
+        name = self.get_stock_name(code)
+
+        event_type_name = {
+            "I": "CONDITION_IN",
+            "D": "CONDITION_OUT",
+        }.get(event_type, "UNKNOWN")
+
+        event = {
+            "condition_index": int(condition_index),
+            "condition_name": condition_name,
+            "code": code,
+            "name": name,
+            "event_type": event_type,
+            "event_type_name": event_type_name,
+            "source": "REALTIME",
+        }
+
+        self.condition_events.append(event)
+
+        print("[Kiwoom] 실시간 조건검색 이벤트")
+        print(json.dumps(event, ensure_ascii=False, indent=2))
+
+    def wait_seconds(self, seconds):
+        loop = QEventLoop()
+
+        timer = QTimer()
+        timer.setSingleShot(True)
+        timer.timeout.connect(loop.exit)
+        timer.start(int(seconds * 1000))
+
+        loop.exec_()
+
+    # ============================================================
+    # Order
+    # ============================================================
 
     def send_market_buy_order(self, account_no, code, quantity):
         return self.send_order(
@@ -186,7 +401,10 @@ class KiwoomAPI:
         org_order_no="",
         wait_ms=10000,
     ):
-        self.last_chejan_data = {}
+        self.chejan_events = []
+        self.last_order_chejan_data = {}
+        self.last_fill_chejan_data = {}
+        self.last_balance_chejan_data = {}
 
         result = self.ocx.dynamicCall(
             "SendOrder(QString, QString, QString, int, QString, int, int, QString, QString)",
@@ -212,6 +430,7 @@ class KiwoomAPI:
                     f"reason={self._get_order_error_message(result)}"
                 ),
                 "chejan": {},
+                "chejan_events": [],
             }
 
         self.order_loop = QEventLoop()
@@ -223,12 +442,23 @@ class KiwoomAPI:
 
         self.order_loop.exec_()
 
+        best_chejan = (
+            self.last_fill_chejan_data
+            or self.last_order_chejan_data
+            or {}
+        )
+
         return {
             "success": True,
             "result_code": result,
             "message": "SendOrder 호출 성공",
-            "chejan": self.last_chejan_data,
+            "chejan": best_chejan,
+            "chejan_events": self.chejan_events,
         }
+
+    # ============================================================
+    # TR event
+    # ============================================================
 
     def _on_receive_tr_data(
         self,
@@ -351,6 +581,10 @@ class KiwoomAPI:
 
         return orders
 
+    # ============================================================
+    # Chejan event
+    # ============================================================
+
     def _on_receive_chejan_data(self, gubun, item_cnt, fid_list):
         data = {
             "gubun": str(gubun),
@@ -368,13 +602,35 @@ class KiwoomAPI:
             "체결량": self._to_positive_int(self._get_chejan_data(911)),
         }
 
-        self.last_chejan_data = data
+        self.chejan_events.append(data)
 
         print("[Kiwoom] Chejan 수신")
         print(json.dumps(data, ensure_ascii=False, indent=2))
 
-        if self.order_loop is not None:
-            self.order_loop.exit()
+        gubun_text = str(gubun)
+
+        if gubun_text == "0":
+            if data.get("주문번호"):
+                self.last_order_chejan_data = data
+
+            has_fill = (
+                data.get("체결가") is not None
+                or data.get("체결량") is not None
+                or data.get("미체결수량") == 0
+            )
+
+            if data.get("주문번호") and has_fill:
+                self.last_fill_chejan_data = data
+
+                if self.order_loop is not None:
+                    self.order_loop.exit()
+
+        elif gubun_text == "1":
+            self.last_balance_chejan_data = data
+
+    # ============================================================
+    # Helpers
+    # ============================================================
 
     def _get_comm_data(self, trcode, rqname, index, item):
         value = self.ocx.dynamicCall(

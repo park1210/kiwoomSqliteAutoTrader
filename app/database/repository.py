@@ -347,6 +347,42 @@ class TradingRepository:
             cursor = conn.execute(sql, (channel, title, message, status))
             conn.commit()
             return cursor.lastrowid
+        
+    def save_condition_event(
+        self,
+        condition_index,
+        condition_name,
+        code,
+        name,
+        event_type,
+        event_type_name,
+        source,
+        raw_data=None,
+    ):
+        sql = """
+        INSERT INTO condition_events (
+            condition_index, condition_name, code, name,
+            event_type, event_type_name, source, raw_data
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """
+
+        with get_connection() as conn:
+            cursor = conn.execute(
+                sql,
+                (
+                    condition_index,
+                    condition_name,
+                    code,
+                    name,
+                    event_type,
+                    event_type_name,
+                    source,
+                    raw_data,
+                ),
+            )
+            conn.commit()
+            return cursor.lastrowid
 
     def save_system_log(self, level, message, detail=None):
         sql = """
