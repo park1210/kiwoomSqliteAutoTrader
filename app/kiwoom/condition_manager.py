@@ -4,9 +4,14 @@ from config import (
     CONDITION_INDEX,
     CONDITION_MAX_INITIAL_CODES,
     CONDITION_NAME,
+    CONDITION_ORDER_MAX_CANDIDATES,
+    CONDITION_ORDER_QTY,
     CONDITION_SCREEN_NO,
     CONDITION_SEARCH_TYPE,
     CONDITION_WATCH_SECONDS,
+    ENABLE_CONDITION_ORDER,
+    USE_INITIAL_CONDITION_CODES_FOR_ORDER,
+    USE_REALTIME_CONDITION_IN_FOR_ORDER,
 )
 
 
@@ -16,10 +21,6 @@ class ConditionManager:
         self.notifier = notifier
 
     def load_and_select_condition(self, kiwoom_api):
-        """
-        조건식 목록을 불러오고 사용할 조건식을 선택한다.
-        CONDITION_INDEX / CONDITION_NAME이 None이면 첫 번째 조건식을 사용한다.
-        """
         kiwoom_api.load_conditions()
         conditions = kiwoom_api.get_condition_list()
 
@@ -29,10 +30,7 @@ class ConditionManager:
             )
 
         condition_list_text = "\n".join(
-            [
-                f"{c['index']} | {c['name']}"
-                for c in conditions
-            ]
+            [f"{c['index']} | {c['name']}" for c in conditions]
         )
 
         self.notifier.send(
@@ -68,9 +66,6 @@ class ConditionManager:
         return selected
 
     def run_condition_watch(self, kiwoom_api, condition):
-        """
-        조건검색 실행 후 일정 시간 실시간 이벤트를 감시한다.
-        """
         condition_index = condition["index"]
         condition_name = condition["name"]
 
@@ -175,3 +170,192 @@ class ConditionManager:
             "initial_codes": initial_codes,
             "realtime_events": realtime_events,
         }
+
+    def build_order_candidates(self, condition_result):
+        """
+        v6 주문 후보 생성.
+        기본적으로 너무 많은 종목을 주문하지 않도록 개수를 제한한다.
+        """
+        condition = condition_result["condition"]
+        initial_codes = condition_result.get("initial_codes", [])
+        realtime_events = condition_result.get("realtime_events", [])
+
+        candidates = []
+        seen = set()
+
+        if USE_INITIAL_CONDITION_CODES_FOR_ORDER:
+            for code in initial_codes:
+                if code not in seen:
+                    candidates.append(
+                        {
+                            "code": code,
+                            "source": "INITIAL",
+                            "event_type_name": "CONDITION_INITIAL",
+                            "condition_index": condition["index"],
+                            "condition_name": condition["name"],
+                        }
+                    )
+                    seen.add(code)
+
+                if len(candidates) >= CONDITION_ORDER_MAX_CANDIDATES:
+                    break
+
+        if USE_REALTIME_CONDITION_IN_FOR_ORDER:
+            for event in realtime_events:
+                if event.get("event_type_name") != "CONDITION_IN":
+                    continue
+
+                code = event["code"]
+
+                if code in seen:
+                    continue
+
+                candidates.append(
+                    {
+                        "code": code,
+                        "source": "REALTIME",
+                        "event_type_name": "CONDITION_IN",
+                        "condition_index": event["condition_index"],
+                        "condition_name": event["condition_name"],
+                    }
+                )
+                seen.add(code)
+
+                if len(candidates) >= CONDITION_ORDER_MAX_CANDIDATES:
+                    break
+
+        self.notifier.send(
+            title="조건검색 주문 후보 생성 완료",
+            message=(
+                f"후보 수: {len(candidates)}\n"
+                f"후보: {json.dumps(candidates, ensure_ascii=False)}\n"
+                f"ENABLE_CONDITION_ORDER={ENABLE_CONDITION_ORDER}"
+            ),
+        )
+
+        return candidates
+
+    def evaluate_and_order_candidates(
+        self,
+        kiwoom_api,
+        account_no,
+        candidates,
+        order_manager,
+        position_manager,
+    ):
+        """
+        조건검색 후보를 평가하고, 설정이 켜져 있을 때만 주문한다.
+        """
+        results = []
+
+        for candidate in candidates:
+            code = candidate["code"]
+            snapshot = kiwoom_api.get_current_price(code)
+
+            self.repository.upsert_stock(
+                code=snapshot["code"],
+                name=snapshot["name"],
+                market="KOSPI",
+            )
+
+            self.repository.save_price_snapshot(
+                code=snapshot["code"],
+                name=snapshot["name"],
+                current_price=snapshot["current_price"],
+                volume=snapshot["volume"],
+                raw_current_price=snapshot["raw_current_price"],
+                raw_volume=snapshot["raw_volume"],
+            )
+
+            is_holding, position = position_manager.is_holding(code)
+            has_unfilled, unfilled = position_manager.has_unfilled_order(
+                account_no=account_no,
+                code=code,
+            )
+
+            if is_holding:
+                decision = "BLOCKED_ALREADY_HOLDING"
+                reason = f"이미 보유 중: {position}"
+                ordered = False
+                order_id = None
+
+            elif has_unfilled:
+                decision = "BLOCKED_UNFILLED_EXISTS"
+                reason = f"미체결 주문 존재: {unfilled}"
+                ordered = False
+                order_id = None
+
+            elif not ENABLE_CONDITION_ORDER:
+                decision = "DRY_RUN"
+                reason = "ENABLE_CONDITION_ORDER=False이므로 주문하지 않고 평가만 수행"
+                ordered = False
+                order_id = None
+
+            else:
+                order_result = order_manager.paper_market_buy(
+                    kiwoom_api=kiwoom_api,
+                    account_no=account_no,
+                    code=snapshot["code"],
+                    name=snapshot["name"],
+                    quantity=CONDITION_ORDER_QTY,
+                    current_price=snapshot["current_price"],
+                )
+
+                ordered = bool(order_result.get("ordered"))
+                order_id = order_result.get("order_id")
+                decision = "ORDER_SENT" if ordered else "ORDER_BLOCKED_OR_FAILED"
+                reason = order_result.get("reason")
+
+                # 주문 후 상태 재동기화
+                position_manager.sync_account_state(
+                    kiwoom_api=kiwoom_api,
+                    account_no=account_no,
+                )
+                position_manager.sync_unfilled_orders(
+                    kiwoom_api=kiwoom_api,
+                    account_no=account_no,
+                )
+
+            decision_id = self.repository.save_condition_trade_decision(
+                condition_index=candidate["condition_index"],
+                condition_name=candidate["condition_name"],
+                code=snapshot["code"],
+                name=snapshot["name"],
+                current_price=snapshot["current_price"],
+                quantity=CONDITION_ORDER_QTY,
+                decision=decision,
+                reason=reason,
+                ordered=ordered,
+                order_id=order_id,
+                raw_data=json.dumps(
+                    {
+                        "candidate": candidate,
+                        "snapshot": snapshot,
+                        "is_holding": is_holding,
+                        "position": position,
+                        "has_unfilled": has_unfilled,
+                        "unfilled": unfilled,
+                    },
+                    ensure_ascii=False,
+                ),
+            )
+
+            results.append(
+                {
+                    "decision_id": decision_id,
+                    "code": snapshot["code"],
+                    "name": snapshot["name"],
+                    "current_price": snapshot["current_price"],
+                    "decision": decision,
+                    "reason": reason,
+                    "ordered": ordered,
+                    "order_id": order_id,
+                }
+            )
+
+            self.notifier.send(
+                title="조건검색 주문 후보 평가 완료",
+                message=json.dumps(results[-1], ensure_ascii=False, indent=2),
+            )
+
+        return results

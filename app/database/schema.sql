@@ -144,3 +144,19 @@ CREATE TABLE IF NOT EXISTS condition_events (
     raw_data TEXT,
     created_at TEXT DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE TABLE IF NOT EXISTS condition_trade_decisions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    condition_index INTEGER,
+    condition_name TEXT,
+    code TEXT,
+    name TEXT,
+    current_price INTEGER,
+    quantity INTEGER,
+    decision TEXT,
+    reason TEXT,
+    ordered INTEGER DEFAULT 0,
+    order_id INTEGER,
+    raw_data TEXT,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+);

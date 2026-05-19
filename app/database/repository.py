@@ -393,3 +393,46 @@ class TradingRepository:
         with get_connection() as conn:
             conn.execute(sql, (level, message, detail))
             conn.commit()
+
+    def save_condition_trade_decision(
+        self,
+        condition_index,
+        condition_name,
+        code,
+        name,
+        current_price,
+        quantity,
+        decision,
+        reason,
+        ordered=False,
+        order_id=None,
+        raw_data=None,
+    ):
+        sql = """
+        INSERT INTO condition_trade_decisions (
+            condition_index, condition_name, code, name,
+            current_price, quantity, decision, reason,
+            ordered, order_id, raw_data
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """
+
+        with get_connection() as conn:
+            cursor = conn.execute(
+                sql,
+                (
+                    condition_index,
+                    condition_name,
+                    code,
+                    name,
+                    current_price,
+                    quantity,
+                    decision,
+                    reason,
+                    1 if ordered else 0,
+                    order_id,
+                    raw_data,
+                ),
+            )
+            conn.commit()
+            return cursor.lastrowid
