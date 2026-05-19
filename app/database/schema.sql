@@ -178,3 +178,13 @@ CREATE TABLE IF NOT EXISTS sell_decisions (
     raw_data TEXT,
     created_at TEXT DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE TABLE IF NOT EXISTS loop_runs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    loop_no INTEGER,
+    status TEXT,
+    message TEXT,
+    started_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    finished_at TEXT,
+    raw_data TEXT
+);

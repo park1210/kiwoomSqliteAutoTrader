@@ -483,3 +483,36 @@ class TradingRepository:
             )
             conn.commit()
             return cursor.lastrowid
+
+    def save_loop_run_start(self, loop_no, status="STARTED", message=None, raw_data=None):
+        sql = """
+        INSERT INTO loop_runs (
+            loop_no, status, message, raw_data
+        )
+        VALUES (?, ?, ?, ?)
+        """
+
+        with get_connection() as conn:
+            cursor = conn.execute(
+                sql,
+                (loop_no, status, message, raw_data),
+            )
+            conn.commit()
+            return cursor.lastrowid
+
+    def update_loop_run_finish(self, loop_run_id, status, message=None, raw_data=None):
+        sql = """
+        UPDATE loop_runs
+        SET status = ?,
+            message = ?,
+            raw_data = COALESCE(?, raw_data),
+            finished_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+        """
+
+        with get_connection() as conn:
+            conn.execute(
+                sql,
+                (status, message, raw_data, loop_run_id),
+            )
+            conn.commit()

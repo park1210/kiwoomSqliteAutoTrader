@@ -33,6 +33,8 @@ def main():
             engine.run_v6_condition_paper_order_test()
         elif RUN_VERSION == "v7":
             engine.run_v7_sell_exit_test()
+        elif RUN_VERSION == "v8":
+            engine.run_v8_trading_loop()
         elif RUN_VERSION == "password":
             engine.run_show_account_password_window()
         else:

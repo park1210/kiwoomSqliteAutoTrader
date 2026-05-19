@@ -3,7 +3,7 @@ from pathlib import Path
 APP_NAME = "Kiwoom SQLite Auto Trader"
 
 # 실행 버전
-RUN_VERSION = "v7"  # v1 / v2 / v3 / v4 / v5 / v6 / v7 / password
+RUN_VERSION = "v8"  # v1 / v2 / v3 / v4 / v5 / v6 / v7 / v8 / password
 
 # simulation: 주문 없음
 # paper: 모의투자
@@ -27,7 +27,10 @@ STRATEGY_NAME = "MovingAverageStrategy"
 # 주문 안전 설정
 # =========================
 
+# 일반 주문 허용 여부
 ENABLE_ORDER = False
+
+# 실전 주문 허용 여부
 ALLOW_LIVE_ORDER = False
 
 TEST_ORDER_CODE = "005930"
@@ -54,9 +57,10 @@ CONDITION_INDEX = None
 CONDITION_NAME = None
 CONDITION_SCREEN_NO = "4000"
 CONDITION_SEARCH_TYPE = 1
-CONDITION_WATCH_SECONDS = 30
+CONDITION_WATCH_SECONDS = 20
 CONDITION_MAX_INITIAL_CODES = 5
 
+# 조건검색 기반 주문
 ENABLE_CONDITION_ORDER = False
 CONDITION_ORDER_MAX_CANDIDATES = 1
 CONDITION_ORDER_QTY = 1
@@ -64,18 +68,43 @@ USE_INITIAL_CONDITION_CODES_FOR_ORDER = True
 USE_REALTIME_CONDITION_IN_FOR_ORDER = True
 
 # =========================
-# v7 매도/청산 설정
+# 매도/청산 설정
 # =========================
 
-# 처음에는 False로 실행해서 매도 판단만 확인하세요.
 ENABLE_SELL_ORDER = False
 
-# 익절/손절 기준
-TAKE_PROFIT_RATE = 3.0     # +3% 이상이면 익절 후보
-STOP_LOSS_RATE = -2.0      # -2% 이하이면 손절 후보
+TAKE_PROFIT_RATE = 3.0
+STOP_LOSS_RATE = -2.0
 
-# 수익률이 위 조건에 걸리지 않으면 보유
 SELL_ONLY_MARKET_ORDER = True
-
-# 매도 후보 최대 개수
 SELL_MAX_CANDIDATES = 3
+
+# =========================
+# v8 자동 운영 루프 설정
+# =========================
+
+ENABLE_TRADING_LOOP = True
+
+# 루프 간격, 초 단위
+LOOP_INTERVAL_SECONDS = 60
+
+# 정규장 기준
+MARKET_OPEN_TIME = "09:00"
+MARKET_CLOSE_TIME = "15:30"
+
+# 개발/테스트용:
+# True면 장 시간이 아니어도 루프를 실행한다.
+ALLOW_LOOP_OUTSIDE_MARKET = True
+
+# 테스트용 반복 횟수
+# None이면 시간 조건에 따라 계속 실행
+MAX_LOOP_COUNT = 3
+
+# 루프 안에서 실행할 기능
+ENABLE_LOOP_ACCOUNT_SYNC = True
+ENABLE_LOOP_SELL_CHECK = True
+ENABLE_LOOP_CONDITION_BUY = True
+
+# 루프에서 조건검색을 매번 새로 실행할지 여부
+# 처음에는 True로 두고 테스트
+RUN_CONDITION_EACH_LOOP = True
