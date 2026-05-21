@@ -105,6 +105,10 @@ ENABLE_LOOP_ACCOUNT_SYNC = True
 ENABLE_LOOP_SELL_CHECK = True
 ENABLE_LOOP_CONDITION_BUY = True
 
-# 루프에서 조건검색을 매번 새로 실행할지 여부
-# 처음에는 True로 두고 테스트
-RUN_CONDITION_EACH_LOOP = True
+# v8.1 변경:
+# 조건식 목록은 매 루프마다 다시 불러오지 않고 최초 1회만 불러온다.
+RUN_CONDITION_EACH_LOOP = False
+
+# v8.1 추가:
+# 같은 프로그램 실행 세션에서 이미 평가한 조건검색 후보 종목은 다시 평가하지 않는다.
+SKIP_ALREADY_EVALUATED_CONDITION_CODES = True

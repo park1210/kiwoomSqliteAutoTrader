@@ -14,6 +14,7 @@ from config import (
     LOOP_INTERVAL_SECONDS,
     MAX_LOOP_COUNT,
     RUN_CONDITION_EACH_LOOP,
+    SKIP_ALREADY_EVALUATED_CONDITION_CODES,
 )
 
 
@@ -47,19 +48,32 @@ class TradingLoop:
             notifier=self.notifier,
         )
 
+        # v8.1: 조건식 목록은 최초 1회만 로딩해서 재사용
         self.selected_condition = None
+
+        # v8.1: 같은 실행 세션에서 이미 평가한 조건검색 후보는 재평가하지 않음
+        self.evaluated_condition_codes = set()
 
     def run(self):
         self.notifier.send(
-            title="v8 자동 운영 루프 시작",
+            title="v8.1 자동 운영 루프 시작",
             message=(
                 f"MAX_LOOP_COUNT={MAX_LOOP_COUNT}\n"
                 f"LOOP_INTERVAL_SECONDS={LOOP_INTERVAL_SECONDS}\n"
                 f"ENABLE_LOOP_ACCOUNT_SYNC={ENABLE_LOOP_ACCOUNT_SYNC}\n"
                 f"ENABLE_LOOP_SELL_CHECK={ENABLE_LOOP_SELL_CHECK}\n"
-                f"ENABLE_LOOP_CONDITION_BUY={ENABLE_LOOP_CONDITION_BUY}"
+                f"ENABLE_LOOP_CONDITION_BUY={ENABLE_LOOP_CONDITION_BUY}\n"
+                f"RUN_CONDITION_EACH_LOOP={RUN_CONDITION_EACH_LOOP}\n"
+                f"SKIP_ALREADY_EVALUATED_CONDITION_CODES="
+                f"{SKIP_ALREADY_EVALUATED_CONDITION_CODES}"
             ),
         )
+
+        # v8.1: 조건식 목록 로딩은 루프 시작 전에 1회만 수행
+        if ENABLE_LOOP_CONDITION_BUY and not RUN_CONDITION_EACH_LOOP:
+            self.selected_condition = self.condition_manager.load_and_select_condition(
+                self.kiwoom_api
+            )
 
         loop_no = 0
 
@@ -68,7 +82,7 @@ class TradingLoop:
 
             if MAX_LOOP_COUNT is not None and loop_no > MAX_LOOP_COUNT:
                 self.notifier.send(
-                    title="v8 자동 운영 루프 종료",
+                    title="v8.1 자동 운영 루프 종료",
                     message=f"MAX_LOOP_COUNT={MAX_LOOP_COUNT}에 도달하여 종료합니다.",
                 )
                 break
@@ -110,12 +124,12 @@ class TradingLoop:
 
                 self.repository.save_system_log(
                     level="ERROR",
-                    message=f"v8 loop error: {e}",
+                    message=f"v8.1 loop error: {e}",
                     detail=error_detail,
                 )
 
                 self.notifier.send(
-                    title="v8 루프 오류 발생",
+                    title="v8.1 루프 오류 발생",
                     message=(
                         f"loop_no={loop_no}\n"
                         f"error={e}\n"
@@ -125,7 +139,7 @@ class TradingLoop:
 
             if MAX_LOOP_COUNT is not None and loop_no >= MAX_LOOP_COUNT:
                 self.notifier.send(
-                    title="v8 자동 운영 루프 종료",
+                    title="v8.1 자동 운영 루프 종료",
                     message=f"loop_no={loop_no}, MAX_LOOP_COUNT={MAX_LOOP_COUNT}",
                 )
                 break
@@ -134,7 +148,7 @@ class TradingLoop:
 
     def _run_once(self, loop_no):
         self.notifier.send(
-            title="v8 루프 실행",
+            title="v8.1 루프 실행",
             message=f"loop_no={loop_no}",
         )
 
@@ -145,8 +159,13 @@ class TradingLoop:
             "condition_result": None,
             "condition_candidates": None,
             "condition_decisions": None,
+            "skipped_condition_codes": [],
         }
 
+        account_state = None
+        unfilled_orders = None
+
+        # v8.1: 루프 초반에 계좌/미체결을 한 번만 동기화
         if ENABLE_LOOP_ACCOUNT_SYNC:
             account_state = self.position_manager.sync_account_state(
                 kiwoom_api=self.kiwoom_api,
@@ -163,12 +182,16 @@ class TradingLoop:
                 "unfilled_count": len(unfilled_orders),
             }
 
+        # v8.1: 매도 판단은 이미 조회한 account_state를 재사용
         if ENABLE_LOOP_SELL_CHECK:
-            sell_results = self._run_sell_check()
+            sell_results = self._run_sell_check(account_state)
             result["sell_results"] = sell_results
 
         if ENABLE_LOOP_CONDITION_BUY:
-            condition_result, candidates, decisions = self._run_condition_buy_check()
+            condition_result, candidates, decisions, skipped_codes = (
+                self._run_condition_buy_check()
+            )
+
             result["condition_result"] = {
                 "condition": condition_result.get("condition"),
                 "initial_count": len(condition_result.get("initial_codes", [])),
@@ -176,19 +199,26 @@ class TradingLoop:
             }
             result["condition_candidates"] = candidates
             result["condition_decisions"] = decisions
+            result["skipped_condition_codes"] = skipped_codes
 
         self.notifier.send(
-            title="v8 루프 완료",
+            title="v8.1 루프 완료",
             message=json.dumps(result, ensure_ascii=False, indent=2),
         )
 
         return result
 
-    def _run_sell_check(self):
-        account_state = self.position_manager.sync_account_state(
-            kiwoom_api=self.kiwoom_api,
-            account_no=self.account_no,
-        )
+    def _run_sell_check(self, account_state=None):
+        """
+        v8.1 변경:
+        기존에는 매도 판단 전에 계좌 동기화를 다시 했지만,
+        이제는 _run_once()에서 이미 조회한 account_state를 재사용한다.
+        """
+        if account_state is None:
+            account_state = self.position_manager.sync_account_state(
+                kiwoom_api=self.kiwoom_api,
+                account_no=self.account_no,
+            )
 
         positions = account_state.get("positions", [])
 
@@ -212,6 +242,11 @@ class TradingLoop:
         return sell_results
 
     def _run_condition_buy_check(self):
+        """
+        v8.1 변경:
+        1. 조건식 목록은 기본적으로 최초 1회만 로딩한다.
+        2. 이미 평가한 후보 종목은 같은 실행 세션에서 다시 평가하지 않는다.
+        """
         if self.selected_condition is None or RUN_CONDITION_EACH_LOOP:
             self.selected_condition = self.condition_manager.load_and_select_condition(
                 self.kiwoom_api
@@ -224,12 +259,47 @@ class TradingLoop:
 
         candidates = self.condition_manager.build_order_candidates(condition_result)
 
+        filtered_candidates = []
+        skipped_codes = []
+
+        if SKIP_ALREADY_EVALUATED_CONDITION_CODES:
+            for candidate in candidates:
+                code = candidate["code"]
+
+                if code in self.evaluated_condition_codes:
+                    skipped_codes.append(code)
+                    continue
+
+                filtered_candidates.append(candidate)
+        else:
+            filtered_candidates = candidates
+
+        if skipped_codes:
+            self.notifier.send(
+                title="조건검색 후보 중복 평가 스킵",
+                message=(
+                    f"이미 평가한 종목 수: {len(skipped_codes)}\n"
+                    f"스킵 종목: {skipped_codes}"
+                ),
+            )
+
+        if not filtered_candidates:
+            self.notifier.send(
+                title="조건검색 주문 후보 없음",
+                message="새로 평가할 조건검색 후보가 없습니다.",
+            )
+
+            return condition_result, candidates, [], skipped_codes
+
         decisions = self.condition_manager.evaluate_and_order_candidates(
             kiwoom_api=self.kiwoom_api,
             account_no=self.account_no,
-            candidates=candidates,
+            candidates=filtered_candidates,
             order_manager=self.order_manager,
             position_manager=self.position_manager,
         )
 
-        return condition_result, candidates, decisions
+        for candidate in filtered_candidates:
+            self.evaluated_condition_codes.add(candidate["code"])
+
+        return condition_result, filtered_candidates, decisions, skipped_codes
