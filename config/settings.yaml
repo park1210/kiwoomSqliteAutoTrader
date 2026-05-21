@@ -1,0 +1,70 @@
+app:
+  name: Kiwoom SQLite Auto Trader
+  run_version: v8
+
+mode: paper
+
+target_codes:
+  - "005930"
+
+strategy:
+  name: MovingAverageStrategy
+  short_window: 5
+  long_window: 20
+
+test_order:
+  code: "005930"
+  qty: 1
+  price: 0
+  hoga_gb: "03"
+
+order:
+  enable_order: false
+  allow_live_order: false
+  max_buy_amount_per_stock: 300000
+  max_holding_count: 3
+  max_daily_loss: -30000
+  block_if_already_holding: true
+  block_if_unfilled_order_exists: true
+
+condition:
+  condition_index:
+  condition_name:
+  screen_no: "4000"
+  search_type: 0
+  watch_seconds: 1
+  max_initial_codes: 5
+  enable_condition_order: false
+  order_max_candidates: 1
+  order_qty: 1
+  use_initial_codes_for_order: true
+  use_realtime_in_for_order: true
+
+sell:
+  enable_sell_order: false
+  take_profit_rate: 3.0
+  stop_loss_rate: -2.0
+  only_market_order: true
+  max_candidates: 3
+
+trading_loop:
+  enable: true
+  loop_interval_seconds: 60
+  market_open_time: "09:00"
+  market_close_time: "15:30"
+  allow_loop_outside_market: true
+  max_loop_count: 3
+  enable_account_sync: true
+  enable_sell_check: true
+  enable_condition_buy: true
+  run_condition_each_loop: false
+  skip_already_evaluated_condition_codes: true
+
+notification:
+  console: true
+  email: false
+  telegram: false
+  notify_on_info: true
+  notify_on_order: true
+  notify_on_error: true
+  notify_on_loop_summary: true

@@ -19,6 +19,8 @@ logs/
 
 # Secrets
 .env
+config/.env
+config/settings.local.yaml
 config_secret.py
 
 # VS Code

@@ -1,13 +1,13 @@
 from datetime import datetime, timedelta
 
 from app.database.repository import TradingRepository
-from app.notifier.console_notifier import ConsoleNotifier
+from app.notifier.notification_service import NotificationService
 
 
 class TradingEngine:
     def __init__(self):
         self.repository = TradingRepository()
-        self.notifier = ConsoleNotifier()
+        self.notifier = NotificationService(repository=self.repository)
 
     def run_v1_simulation(self):
         from app.strategy.moving_average_strategy import MovingAverageStrategy
