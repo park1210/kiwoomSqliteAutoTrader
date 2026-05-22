@@ -70,6 +70,12 @@ trading_loop:
   run_condition_each_loop: false
   skip_already_evaluated_condition_codes: true
 
+  # v8.2
+  # kiwoon: 키움 HTS 조건검색
+  # code : 코드/YAML 기반 조건검색
+  # both : 둘 다 실행
+  condition_source: code
+
 notification:
   console: true
 
