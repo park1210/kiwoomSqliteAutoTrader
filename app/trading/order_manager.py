@@ -1,6 +1,7 @@
 import json
 
 from app.trading.risk_manager import RiskManager
+from app.trading.safety_guard import SafetyGuard
 from config import (
     BLOCK_IF_ALREADY_HOLDING,
     BLOCK_IF_UNFILLED_ORDER_EXISTS,
@@ -14,6 +15,7 @@ class OrderManager:
         self.notifier = notifier
         self.position_manager = position_manager
         self.risk_manager = RiskManager()
+        self.safety_guard = SafetyGuard(repository=repository, notifier=notifier)
 
     def paper_market_buy(
         self,
@@ -76,6 +78,39 @@ class OrderManager:
             reason="v4 모의투자 시장가 매수 테스트",
             status="REQUESTED",
         )
+
+        safety_ok, safety_reason = self.safety_guard.validate_order(
+            kiwoom_api=kiwoom_api,
+            code=code,
+            name=name,
+            order_type="BUY",
+            quantity=quantity,
+            price=0,
+            current_price=current_price,
+        )
+
+        if not safety_ok:
+            self.repository.update_order_status(
+                order_id=order_id,
+                status="BLOCKED_BY_SAFETY",
+            )
+
+            self.notifier.send(
+                title="매수 주문 안전장치 차단",
+                message=(
+                    f"종목코드: {code}\n"
+                    f"종목명: {name}\n"
+                    f"수량: {quantity}\n"
+                    f"사유: {safety_reason}"
+                ),
+            )
+
+            return {
+                "ordered": False,
+                "reason": safety_reason,
+                "order_id": order_id,
+                "send_result": None,
+            }
 
         send_result = kiwoom_api.send_market_buy_order(
             account_no=account_no,
@@ -187,6 +222,39 @@ class OrderManager:
             reason=reason,
             status="REQUESTED",
         )
+
+        safety_ok, safety_reason = self.safety_guard.validate_order(
+            kiwoom_api=kiwoom_api,
+            code=code,
+            name=name,
+            order_type="SELL",
+            quantity=quantity,
+            price=0,
+            current_price=None,
+        )
+
+        if not safety_ok:
+            self.repository.update_order_status(
+                order_id=order_id,
+                status="BLOCKED_BY_SAFETY",
+            )
+
+            self.notifier.send(
+                title="매도 주문 안전장치 차단",
+                message=(
+                    f"종목코드: {code}\n"
+                    f"종목명: {name}\n"
+                    f"수량: {quantity}\n"
+                    f"사유: {safety_reason}"
+                ),
+            )
+
+            return {
+                "ordered": False,
+                "reason": safety_reason,
+                "order_id": order_id,
+                "send_result": None,
+            }
 
         send_result = kiwoom_api.send_market_sell_order(
             account_no=account_no,

@@ -484,6 +484,106 @@ REPORT_INCLUDE_NOTIFICATIONS = get_nested(
 )
 
 # =========================
+# 안전장치 설정 v11
+# =========================
+
+SAFETY_ENABLE = get_nested(
+    SETTINGS,
+    "safety.enable",
+    True,
+)
+
+SAFETY_MAX_DAILY_ORDERS = get_nested(
+    SETTINGS,
+    "safety.max_daily_orders",
+    10,
+)
+
+SAFETY_MAX_DAILY_BUY_ORDERS = get_nested(
+    SETTINGS,
+    "safety.max_daily_buy_orders",
+    5,
+)
+
+SAFETY_MAX_DAILY_SELL_ORDERS = get_nested(
+    SETTINGS,
+    "safety.max_daily_sell_orders",
+    5,
+)
+
+SAFETY_MAX_DAILY_BUY_AMOUNT = get_nested(
+    SETTINGS,
+    "safety.max_daily_buy_amount",
+    1_000_000,
+)
+
+SAFETY_MAX_DAILY_ORDERS_PER_CODE = get_nested(
+    SETTINGS,
+    "safety.max_daily_orders_per_code",
+    2,
+)
+
+SAFETY_BLOCK_NEAR_MARKET_OPEN = get_nested(
+    SETTINGS,
+    "safety.block_near_market_open",
+    True,
+)
+
+SAFETY_BLOCK_NEAR_MARKET_CLOSE = get_nested(
+    SETTINGS,
+    "safety.block_near_market_close",
+    True,
+)
+
+SAFETY_MARKET_OPEN_BUFFER_MINUTES = get_nested(
+    SETTINGS,
+    "safety.market_open_buffer_minutes",
+    5,
+)
+
+SAFETY_MARKET_CLOSE_BUFFER_MINUTES = get_nested(
+    SETTINGS,
+    "safety.market_close_buffer_minutes",
+    10,
+)
+
+SAFETY_BLOCK_LIVE_SERVER_ORDER = get_nested(
+    SETTINGS,
+    "safety.block_live_server_order",
+    True,
+)
+
+SAFETY_REQUIRE_LIVE_ORDER_APPROVAL = get_nested(
+    SETTINGS,
+    "safety.require_live_order_approval",
+    True,
+)
+
+SAFETY_LIVE_ORDER_APPROVAL_TEXT = get_nested(
+    SETTINGS,
+    "safety.live_order_approval_text",
+    "I_APPROVE_LIVE_ORDER",
+)
+
+SAFETY_BLACKLIST = get_nested(
+    SETTINGS,
+    "safety.blacklist",
+    [],
+)
+
+SAFETY_WHITELIST = get_nested(
+    SETTINGS,
+    "safety.whitelist",
+    [],
+)
+
+SAFETY_MAX_SINGLE_ORDER_AMOUNT = get_nested(
+    SETTINGS,
+    "safety.max_single_order_amount",
+    300_000,
+)
+
+# =========================
 # 환경변수 이름
 # =========================
 

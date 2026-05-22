@@ -201,3 +201,17 @@ CREATE TABLE IF NOT EXISTS code_condition_events (
     raw_data TEXT,
     created_at TEXT DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE TABLE IF NOT EXISTS safety_checks (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    code TEXT,
+    name TEXT,
+    order_type TEXT,
+    quantity INTEGER,
+    price INTEGER,
+    estimated_amount INTEGER,
+    passed INTEGER DEFAULT 0,
+    reason TEXT,
+    raw_data TEXT,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+);

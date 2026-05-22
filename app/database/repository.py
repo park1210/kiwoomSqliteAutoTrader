@@ -552,3 +552,76 @@ class TradingRepository:
             )
             conn.commit()
             return cursor.lastrowid
+        
+    def save_safety_check(
+        self,
+        code,
+        name,
+        order_type,
+        quantity,
+        price,
+        estimated_amount,
+        passed,
+        reason,
+        raw_data=None,
+    ):
+        sql = """
+        INSERT INTO safety_checks (
+            code, name, order_type, quantity, price,
+            estimated_amount, passed, reason, raw_data
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """
+
+        with get_connection() as conn:
+            cursor = conn.execute(
+                sql,
+                (
+                    code,
+                    name,
+                    order_type,
+                    quantity,
+                    price,
+                    estimated_amount,
+                    1 if passed else 0,
+                    reason,
+                    raw_data,
+                ),
+            )
+            conn.commit()
+            return cursor.lastrowid
+
+    def count_today_orders(self, order_type=None, code=None):
+        sql = """
+        SELECT COUNT(*) AS count
+        FROM orders
+        WHERE DATE(created_at) = DATE('now', 'localtime')
+        """
+        params = []
+
+        if order_type is not None:
+            sql += " AND order_type = ?"
+            params.append(order_type)
+
+        if code is not None:
+            sql += " AND code = ?"
+            params.append(code)
+
+        with get_connection() as conn:
+            row = conn.execute(sql, params).fetchone()
+
+        return row["count"] if row else 0
+
+    def sum_today_buy_order_amount(self):
+        sql = """
+        SELECT COALESCE(SUM(quantity * price), 0) AS total_amount
+        FROM orders
+        WHERE DATE(created_at) = DATE('now', 'localtime')
+          AND order_type = 'BUY'
+          AND status IN ('REQUESTED', 'SUBMITTED', 'FILLED')
+        """
+
+        with get_connection() as conn:
+            row = conn.execute(sql).fetchone()
+
+        return row["total_amount"] if row else 0

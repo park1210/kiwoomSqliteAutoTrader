@@ -41,6 +41,8 @@ def main():
             engine.run_v8_trading_loop()
         elif RUN_VERSION == "v10":
             engine.run_v10_trading_report()
+        elif RUN_VERSION == "v11":
+            engine.run_v11_safety_guard_test()
         elif RUN_VERSION == "password":
             engine.run_show_account_password_window()
         else:
