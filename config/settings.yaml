@@ -126,3 +126,17 @@ code_condition:
     enable_order: false
     qty: 1
     max_candidates: 1
+
+report:
+  output_dir: reports
+  lookback_days: 1
+  max_rows: 20
+  send_notification: true
+  send_full_report: true
+
+  include_account_summary: true
+  include_sell_decisions: true
+  include_condition_trade_decisions: true
+  include_code_condition_events: true
+  include_loop_runs: true
+  include_notifications: true

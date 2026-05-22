@@ -39,6 +39,8 @@ def main():
             engine.run_v7_sell_exit_test()
         elif RUN_VERSION in ["v8", "v8.2", "v8_2"]:
             engine.run_v8_trading_loop()
+        elif RUN_VERSION == "v10":
+            engine.run_v10_trading_report()
         elif RUN_VERSION == "password":
             engine.run_show_account_password_window()
         else:

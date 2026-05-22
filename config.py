@@ -413,6 +413,75 @@ NOTIFY_ON_LOOP_SUMMARY = get_nested(
     True,
 )
 
+# =========================
+# 리포트 설정 v10
+# =========================
+
+REPORT_OUTPUT_DIR = get_nested(
+    SETTINGS,
+    "report.output_dir",
+    "reports",
+)
+
+REPORT_LOOKBACK_DAYS = get_nested(
+    SETTINGS,
+    "report.lookback_days",
+    1,
+)
+
+REPORT_MAX_ROWS = get_nested(
+    SETTINGS,
+    "report.max_rows",
+    20,
+)
+
+REPORT_SEND_NOTIFICATION = get_nested(
+    SETTINGS,
+    "report.send_notification",
+    True,
+)
+
+REPORT_SEND_FULL_REPORT = get_nested(
+    SETTINGS,
+    "report.send_full_report",
+    True,
+)
+
+REPORT_INCLUDE_ACCOUNT_SUMMARY = get_nested(
+    SETTINGS,
+    "report.include_account_summary",
+    True,
+)
+
+REPORT_INCLUDE_SELL_DECISIONS = get_nested(
+    SETTINGS,
+    "report.include_sell_decisions",
+    True,
+)
+
+REPORT_INCLUDE_CONDITION_TRADE_DECISIONS = get_nested(
+    SETTINGS,
+    "report.include_condition_trade_decisions",
+    True,
+)
+
+REPORT_INCLUDE_CODE_CONDITION_EVENTS = get_nested(
+    SETTINGS,
+    "report.include_code_condition_events",
+    True,
+)
+
+REPORT_INCLUDE_LOOP_RUNS = get_nested(
+    SETTINGS,
+    "report.include_loop_runs",
+    True,
+)
+
+REPORT_INCLUDE_NOTIFICATIONS = get_nested(
+    SETTINGS,
+    "report.include_notifications",
+    True,
+)
 
 # =========================
 # 환경변수 이름

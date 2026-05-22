@@ -29,3 +29,6 @@ config_secret.py
 # OS
 .DS_Store
 Thumbs.db
+
+# reports
+reports/
