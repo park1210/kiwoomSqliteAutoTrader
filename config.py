@@ -342,3 +342,21 @@ CODE_CONDITION_MAX_RETRY = get_nested(
     "code_condition.max_retry",
     2,
 )
+
+CODE_CONDITION_ENABLE_ORDER = get_nested(
+    SETTINGS,
+    "code_condition.order.enable_order",
+    False,
+)
+
+CODE_CONDITION_ORDER_QTY = get_nested(
+    SETTINGS,
+    "code_condition.order.qty",
+    1,
+)
+
+CODE_CONDITION_ORDER_MAX_CANDIDATES = get_nested(
+    SETTINGS,
+    "code_condition.order.max_candidates",
+    1,
+)

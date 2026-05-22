@@ -33,6 +33,8 @@ def main():
             engine.run_v5_1_code_condition_test()
         elif RUN_VERSION == "v6":
             engine.run_v6_condition_paper_order_test()
+        elif RUN_VERSION in ["v6.1", "v6_1"]:
+            engine.run_v6_1_code_condition_order_test()
         elif RUN_VERSION == "v7":
             engine.run_v7_sell_exit_test()
         elif RUN_VERSION == "v8":

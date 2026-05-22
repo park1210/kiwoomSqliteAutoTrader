@@ -115,3 +115,8 @@ code_condition:
   # 키움 TR 과부하 방지
   request_delay_seconds: 1.2
   max_retry: 2
+
+  order:
+    enable_order: false
+    qty: 1
+    max_candidates: 1
