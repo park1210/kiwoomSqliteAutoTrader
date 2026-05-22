@@ -625,3 +625,43 @@ class TradingRepository:
             row = conn.execute(sql).fetchone()
 
         return row["total_amount"] if row else 0
+    
+    def save_strategy_signal(
+        self,
+        strategy_name,
+        code,
+        name,
+        signal,
+        confidence,
+        price,
+        volume,
+        reason,
+        features=None,
+        raw_data=None,
+    ):
+        sql = """
+        INSERT INTO strategy_signals (
+            strategy_name, code, name, signal, confidence,
+            price, volume, reason, features, raw_data
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """
+
+        with get_connection() as conn:
+            cursor = conn.execute(
+                sql,
+                (
+                    strategy_name,
+                    code,
+                    name,
+                    signal,
+                    confidence,
+                    price,
+                    volume,
+                    reason,
+                    features,
+                    raw_data,
+                ),
+            )
+            conn.commit()
+            return cursor.lastrowid

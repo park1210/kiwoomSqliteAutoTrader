@@ -584,6 +584,34 @@ SAFETY_MAX_SINGLE_ORDER_AMOUNT = get_nested(
 )
 
 # =========================
+# 전략 플러그인 설정 v12
+# =========================
+
+STRATEGY_PLUGIN_ENABLE = get_nested(
+    SETTINGS,
+    "strategy_plugin.enable",
+    True,
+)
+
+STRATEGY_PLUGIN_NAME = get_nested(
+    SETTINGS,
+    "strategy_plugin.name",
+    "price_volume_plugin",
+)
+
+STRATEGY_PLUGIN_UNIVERSE = get_nested(
+    SETTINGS,
+    "strategy_plugin.universe",
+    ["005930"],
+)
+
+STRATEGY_PLUGIN_PARAMS = get_nested(
+    SETTINGS,
+    "strategy_plugin.params",
+    {},
+)
+
+# =========================
 # 환경변수 이름
 # =========================
 

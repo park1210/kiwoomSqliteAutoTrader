@@ -174,3 +174,22 @@ safety:
 
   # 주문 금액 제한
   max_single_order_amount: 300000
+
+strategy_plugin:
+  enable: true
+
+  # 사용할 전략 플러그인 이름
+  # app/strategy/plugins/price_volume_plugin.py 와 연결됨
+  name: price_volume_plugin
+
+  universe:
+    - "005930"
+    - "000660"
+    - "035420"
+
+  params:
+    min_price: 1000
+    max_price: 500000
+    min_volume: 100000
+    buy_confidence: 0.7
+    hold_confidence: 0.5

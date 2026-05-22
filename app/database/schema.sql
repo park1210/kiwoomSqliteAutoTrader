@@ -215,3 +215,18 @@ CREATE TABLE IF NOT EXISTS safety_checks (
     raw_data TEXT,
     created_at TEXT DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE TABLE IF NOT EXISTS strategy_signals (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    strategy_name TEXT NOT NULL,
+    code TEXT NOT NULL,
+    name TEXT,
+    signal TEXT NOT NULL,
+    confidence REAL,
+    price INTEGER,
+    volume INTEGER,
+    reason TEXT,
+    features TEXT,
+    raw_data TEXT,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
