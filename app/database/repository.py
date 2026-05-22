@@ -516,3 +516,39 @@ class TradingRepository:
                 (status, message, raw_data, loop_run_id),
             )
             conn.commit()
+
+    def save_code_condition_event(
+        self,
+        condition_name,
+        code,
+        name,
+        current_price,
+        volume,
+        passed,
+        reason,
+        raw_data=None,
+    ):
+        sql = """
+        INSERT INTO code_condition_events (
+            condition_name, code, name, current_price,
+            volume, passed, reason, raw_data
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """
+
+        with get_connection() as conn:
+            cursor = conn.execute(
+                sql,
+                (
+                    condition_name,
+                    code,
+                    name,
+                    current_price,
+                    volume,
+                    1 if passed else 0,
+                    reason,
+                    raw_data,
+                ),
+            )
+            conn.commit()
+            return cursor.lastrowid

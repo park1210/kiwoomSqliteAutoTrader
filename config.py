@@ -266,3 +266,79 @@ EMAIL_TO_ENV = "KSA_EMAIL_TO"
 
 TELEGRAM_BOT_TOKEN_ENV = "KSA_TELEGRAM_BOT_TOKEN"
 TELEGRAM_CHAT_ID_ENV = "KSA_TELEGRAM_CHAT_ID"
+
+# =========================
+# 코드 기반 조건검색 설정 v5.1
+# =========================
+
+CODE_CONDITION_ENABLE = get_nested(
+    SETTINGS,
+    "code_condition.enable",
+    True,
+)
+
+CODE_CONDITION_MAX_UNIVERSE_SIZE = get_nested(
+    SETTINGS,
+    "code_condition.max_universe_size",
+    20,
+)
+
+CODE_CONDITION_MAX_CANDIDATES = get_nested(
+    SETTINGS,
+    "code_condition.max_candidates",
+    3,
+)
+
+CODE_CONDITION_UNIVERSE_TYPE = get_nested(
+    SETTINGS,
+    "code_condition.universe.type",
+    "manual",
+)
+
+CODE_CONDITION_UNIVERSE_CODES = get_nested(
+    SETTINGS,
+    "code_condition.universe.codes",
+    ["005930"],
+)
+
+CODE_CONDITION_MIN_PRICE = get_nested(
+    SETTINGS,
+    "code_condition.filters.min_price",
+    1000,
+)
+
+CODE_CONDITION_MAX_PRICE = get_nested(
+    SETTINGS,
+    "code_condition.filters.max_price",
+    500000,
+)
+
+CODE_CONDITION_MIN_VOLUME = get_nested(
+    SETTINGS,
+    "code_condition.filters.min_volume",
+    100000,
+)
+
+CODE_CONDITION_EXCLUDE_HOLDING = get_nested(
+    SETTINGS,
+    "code_condition.filters.exclude_holding",
+    True,
+)
+
+CODE_CONDITION_EXCLUDE_UNFILLED = get_nested(
+    SETTINGS,
+    "code_condition.filters.exclude_unfilled",
+    True,
+)
+
+CODE_CONDITION_REQUEST_DELAY_SECONDS = get_nested(
+    SETTINGS,
+    "code_condition.request_delay_seconds",
+    0.7,
+)
+
+CODE_CONDITION_MAX_RETRY = get_nested(
+    SETTINGS,
+    "code_condition.max_retry",
+    2,
+)

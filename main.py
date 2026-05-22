@@ -29,6 +29,8 @@ def main():
             engine.run_v4_order_position_tracking()
         elif RUN_VERSION == "v5":
             engine.run_v5_condition_search_test()
+        elif RUN_VERSION in ["v5.1", "v5_1"]:
+            engine.run_v5_1_code_condition_test()
         elif RUN_VERSION == "v6":
             engine.run_v6_condition_paper_order_test()
         elif RUN_VERSION == "v7":

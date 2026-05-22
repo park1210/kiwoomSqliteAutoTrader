@@ -31,8 +31,15 @@ condition:
   condition_index:
   condition_name:
   screen_no: "4000"
+
+  # HTS 조건검색 반복 실행 안정성을 위해 기본은 일반 조건검색
+  # 0: 일반 조건검색
+  # 1: 실시간 조건검색
   search_type: 0
+
+  # 일반 조건검색에서는 길게 기다릴 필요가 적음
   watch_seconds: 1
+
   max_initial_codes: 5
   enable_condition_order: false
   order_max_candidates: 1
@@ -54,17 +61,57 @@ trading_loop:
   market_close_time: "15:30"
   allow_loop_outside_market: true
   max_loop_count: 3
+
   enable_account_sync: true
   enable_sell_check: true
   enable_condition_buy: true
+
+  # v8.1 최적화
   run_condition_each_loop: false
   skip_already_evaluated_condition_codes: true
 
 notification:
   console: true
+
+  # 기본값은 외부 알림 OFF
+  # 개인 환경에 따라 settings.local.yaml에서 켜기
   email: false
   telegram: false
+
   notify_on_info: true
   notify_on_order: true
   notify_on_error: true
   notify_on_loop_summary: true
+
+code_condition:
+  enable: true
+
+  # 기본값은 10개 정도가 안전
+  # 더 늘리고 싶으면 settings.local.yaml에서 override
+  max_universe_size: 10
+  max_candidates: 3
+
+  universe:
+    type: manual
+    codes:
+      - "005930"
+      - "000660"
+      - "035420"
+      - "035720"
+      - "005380"
+      - "000270"
+      - "068270"
+      - "051910"
+      - "005490"
+      - "105560"
+
+  filters:
+    min_price: 1000
+    max_price: 500000
+    min_volume: 100000
+    exclude_holding: true
+    exclude_unfilled: true
+
+  # 키움 TR 과부하 방지
+  request_delay_seconds: 1.2
+  max_retry: 2

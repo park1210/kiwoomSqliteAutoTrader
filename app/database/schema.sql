@@ -188,3 +188,16 @@ CREATE TABLE IF NOT EXISTS loop_runs (
     finished_at TEXT,
     raw_data TEXT
 );
+
+CREATE TABLE IF NOT EXISTS code_condition_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    condition_name TEXT,
+    code TEXT NOT NULL,
+    name TEXT,
+    current_price INTEGER,
+    volume INTEGER,
+    passed INTEGER DEFAULT 0,
+    reason TEXT,
+    raw_data TEXT,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
