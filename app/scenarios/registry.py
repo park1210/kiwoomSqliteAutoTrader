@@ -27,6 +27,11 @@ SCENARIO_REGISTRY = {
     "v6.1": CodeConditionOrderScenario,
     "v6_1": CodeConditionOrderScenario,
     "v7": SellExitTestScenario,
+    "v8": TradingLoopScenario,
+    "v8.1": TradingLoopScenario,
+    "v8_1": TradingLoopScenario,
+    "v8.2": TradingLoopScenario,
+    "v8_2": TradingLoopScenario,
 }
 
 
