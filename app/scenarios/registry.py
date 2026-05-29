@@ -23,6 +23,7 @@ SCENARIO_REGISTRY = {
     "v5": KiwoomConditionScanScenario,
     "v5.1": CodeConditionScanScenario,
     "v5_1": CodeConditionScanScenario,
+    "v6": KiwoomConditionOrderScenario,
 }
 
 
