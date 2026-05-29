@@ -15,7 +15,8 @@ from app.scenarios.trading_report import TradingReportScenario
 
 
 SCENARIO_REGISTRY = {
-    
+    "v5.1": CodeConditionScanScenario,
+    "v5_1": CodeConditionScanScenario,
 }
 
 
