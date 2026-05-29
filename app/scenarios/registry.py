@@ -33,6 +33,7 @@ SCENARIO_REGISTRY = {
     "v8.2": TradingLoopScenario,
     "v8_2": TradingLoopScenario,
     "v9": TradingReportScenario,
+    "v10": SafetyGuardTestScenario,
 }
 
 
