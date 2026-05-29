@@ -26,6 +26,7 @@ SCENARIO_REGISTRY = {
     "v6": KiwoomConditionOrderScenario,
     "v6.1": CodeConditionOrderScenario,
     "v6_1": CodeConditionOrderScenario,
+    "v7": SellExitTestScenario,
 }
 
 
