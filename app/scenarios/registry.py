@@ -15,7 +15,7 @@ from app.scenarios.trading_report import TradingReportScenario
 
 
 SCENARIO_REGISTRY = {
-    
+    "v9": TradingReportScenario,
 }
 
 
