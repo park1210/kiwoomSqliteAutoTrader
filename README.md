@@ -129,10 +129,16 @@ sequenceDiagram
 ### 4. Trading Orchestration
 
 - `app/trading/trading_engine.py`
-  - 기능별 실행 시나리오를 조합하는 상위 오케스트레이터
-  - `v1 ~ v12` 테스트/운영 루틴 실행
+  - 실행 버전을 시나리오 파일로 라우팅하는 상위 오케스트레이터
 - `app/trading/trading_loop.py`
   - 계좌 동기화, 매도 판단, 조건기반 매수 판단을 반복 실행
+
+### 4.1 Scenario Layer
+
+- `app/scenarios/`
+  - `RUN_VERSION`별 실행 파일 모음
+  - 각 버전 기능을 파일 단위로 분리
+  - 상세 브랜치 운영 기준은 `BRANCH_STRATEGY.md` 참고
 
 ### 5. Strategy / Condition Layer
 
@@ -248,6 +254,7 @@ flowchart LR
 ```text
 .
 |-- main.py
+|-- BRANCH_STRATEGY.md
 |-- config.py
 |-- requirements.txt
 |-- config/
@@ -257,6 +264,7 @@ flowchart LR
 |   |-- kiwoom/
 |   |-- notifier/
 |   |-- report/
+|   |-- scenarios/
 |   |-- strategy/
 |   `-- trading/
 |-- data/
