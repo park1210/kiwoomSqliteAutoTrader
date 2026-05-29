@@ -15,7 +15,11 @@ from app.scenarios.trading_report import TradingReportScenario
 
 
 SCENARIO_REGISTRY = {
-    
+    "v8": TradingLoopScenario,
+    "v8.1": TradingLoopScenario,
+    "v8_1": TradingLoopScenario,
+    "v8.2": TradingLoopScenario,
+    "v8_2": TradingLoopScenario,
 }
 
 
