@@ -9,6 +9,25 @@ Windows 환경에서 `PyQt5 + Kiwoom OpenAPI+ + SQLite`를 사용해 자동매�
 - 핵심 흐름은 `키움 API 연동 -> 전략/조건 평가 -> 주문/매도 판단 -> DB 기록 -> 알림/리포트`입니다.
 - 데이터 저장소는 SQLite(`data/trading.db`)입니다.
 
+## Current Branch Workflow
+
+현재 저장소는 아래 흐름으로 관리합니다.
+
+```text
+clean-base -> feature/* -> integration/all-features -> main
+```
+
+- `clean-base`
+  - 공통 인프라 전용 브랜치
+  - 새 기능 브랜치의 출발점
+- `feature/*`
+  - 기능별 전용 브랜치
+  - 각 브랜치는 `clean-base + 해당 기능 파일`만 포함
+- `integration/all-features`
+  - feature 브랜치를 순차적으로 merge하며 충돌을 해소하는 통합 브랜치
+- `main`
+  - 최종 검증 완료본
+
 ## Architecture Diagram
 
 ```mermaid
@@ -17,61 +36,40 @@ flowchart TD
     A --> C[QApplication]
     A --> D[init_db]
 
-    B --> E[KiwoomAPI]
-    B --> F[TradingLoop]
-    B --> G[ConditionManager]
-    B --> H[CodeConditionEngine]
-    B --> I[OrderManager]
-    B --> J[PositionManager]
-    B --> K[SellManager]
-    B --> L[StrategyRunner]
-    B --> M[ReportService]
-    B --> N[NotificationService]
+    B --> E[Scenario Registry]
+    E --> F[SimulationScenario]
+    E --> G[SnapshotScenario]
+    E --> H[PaperOrderTestScenario]
+    E --> I[PositionTrackingScenario]
+    E --> J[KiwoomConditionScanScenario]
+    E --> K[CodeConditionScanScenario]
+    E --> L[KiwoomConditionOrderScenario]
+    E --> M[CodeConditionOrderScenario]
+    E --> N[SellExitTestScenario]
+    E --> O[TradingLoopScenario]
+    E --> P[TradingReportScenario]
+    E --> Q[SafetyGuardTestScenario]
+    E --> R[StrategyPluginTestScenario]
+    E --> S[PasswordWindowScenario]
 
-    E --> O[Kiwoom OpenAPI+ ActiveX]
-
-    F --> J
-    F --> K
-    F --> G
-    F --> H
-    F --> I
-
-    H --> P[UniverseProvider]
-    H --> Q[BasicPriceVolumeFilter]
-
-    L --> R[StrategyLoader]
-    R --> S[Strategy Plugin]
-
-    I --> T[RiskManager]
-    I --> U[SafetyGuard]
-    I --> J
-
-    G --> E
-    H --> E
-    J --> E
-    K --> I
-    L --> E
-
-    B --> V[TradingRepository]
-    F --> V
-    G --> V
-    H --> V
-    I --> V
-    J --> V
-    K --> V
+    F --> T[TradingRepository]
+    G --> U[KiwoomAPI]
+    H --> V[OrderManager]
+    I --> W[PositionManager]
+    J --> X[ConditionManager]
+    K --> Y[CodeConditionEngine]
+    L --> X
     L --> V
-    M --> V
-    N --> V
+    M --> Z[CodeConditionOrderService]
+    N --> AA[SellManager]
+    O --> AB[TradingLoop]
+    P --> AC[ReportService]
+    Q --> AD[SafetyGuard]
+    R --> AE[StrategyRunner]
 
-    V --> W[(SQLite DB)]
-
-    N --> X[ConsoleNotifier]
-    N --> Y[EmailNotifier]
-    N --> Z[TelegramNotifier]
-
-    M --> AA[PerformanceAnalyzer]
-    M --> AB[ReportGenerator]
-    AB --> AC[Markdown Report]
+    U --> AF[Kiwoom OpenAPI+ ActiveX]
+    T --> AG[(SQLite DB)]
+    AC --> AH[Markdown Report]
 ```
 
 ## Runtime Flow
@@ -81,184 +79,143 @@ sequenceDiagram
     participant User
     participant Main as main.py
     participant Engine as TradingEngine
-    participant Kiwoom as KiwoomAPI
-    participant Logic as Strategy/Condition/Trading Logic
+    participant Registry as Scenario Registry
+    participant Scenario as Scenario
+    participant Logic as Domain Logic
     participant Repo as TradingRepository
     participant DB as SQLite
-    participant Notify as NotificationService
 
     User->>Main: 프로그램 실행
     Main->>Main: QApplication 생성
     Main->>Repo: DB 초기화
-    Main->>Engine: RUN_VERSION에 맞는 시나리오 실행
-    Engine->>Kiwoom: 로그인 및 시세/계좌/조건검색 요청
-    Kiwoom-->>Engine: TR/조건검색/체결 이벤트 반환
-    Engine->>Logic: 전략 평가 / 주문 판단 / 매도 판단
-    Logic->>Repo: 스냅샷, 주문, 체결, 포지션, 이벤트 저장
+    Main->>Engine: RUN_VERSION 전달
+    Engine->>Registry: 시나리오 클래스 조회
+    Registry-->>Engine: Scenario class
+    Engine->>Scenario: run()
+    Scenario->>Logic: 키움 조회 / 전략 평가 / 주문 판단
+    Logic->>Repo: 스냅샷 / 주문 / 체결 / 이벤트 저장
     Repo->>DB: SQLite 기록
-    Logic->>Notify: 실행 결과 알림
-    Notify-->>User: 콘솔/이메일/텔레그램 알림
 ```
 
 ## Module Map
 
-### 1. Entry Point
+### Entry Point
 
 - `main.py`
   - `QApplication` 생성
   - DB 초기화
-  - `RUN_VERSION`에 따라 `TradingEngine`의 시나리오 실행
+  - `RUN_VERSION`을 `TradingEngine`으로 전달
 
-### 2. Configuration
+### Configuration
 
 - `config.py`
   - YAML 및 `.env` 로드
-  - 주문/조건검색/루프/알림/리포트/안전장치 설정을 전역 상수로 제공
+  - 주문, 조건검색, 루프, 리포트, 안전장치 설정 제공
 - `config/settings.yaml`
   - 기본 실행 설정 파일
 
-### 3. Broker Layer
-
-- `app/kiwoom/kiwoom_api.py`
-  - 키움 OpenAPI+ ActiveX 래퍼
-  - 로그인, 현재가 조회, 계좌 조회, 미체결 조회
-  - 조건검색 로드/실행/중지
-  - 시장가 매수/매도 주문
-  - 체결(Chejan) 이벤트 수신
-
-### 4. Trading Orchestration
-
-- `app/trading/trading_engine.py`
-  - 실행 버전을 시나리오 파일로 라우팅하는 상위 오케스트레이터
-- `app/trading/trading_loop.py`
-  - 계좌 동기화, 매도 판단, 조건기반 매수 판단을 반복 실행
-
-### 4.1 Scenario Layer
+### Scenario Layer
 
 - `app/scenarios/`
   - `RUN_VERSION`별 실행 파일 모음
-  - 각 버전 기능을 파일 단위로 분리
-  - 상세 브랜치 운영 기준은 `BRANCH_STRATEGY.md` 참고
+  - 각 기능을 시나리오 파일 단위로 분리
+- `app/scenarios/registry.py`
+  - `RUN_VERSION -> Scenario` 매핑
 
-### 5. Strategy / Condition Layer
+### Broker Layer
+
+- `app/kiwoom/kiwoom_api.py`
+  - 로그인
+  - 현재가 조회
+  - 계좌 조회
+  - 미체결 조회
+  - 조건검색
+  - 주문 전송
+
+### Trading / Strategy Layer
 
 - `app/kiwoom/condition_manager.py`
-  - 키움 HTS 조건검색식 기반 후보 추출 및 주문 평가
+  - 키움 조건검색 관리
 - `app/strategy/code_condition_engine.py`
-  - 코드/YAML 기반 조건검색 엔진
-  - Universe 순회 후 가격/거래량 조건으로 종목 선별
-- `app/strategy/filters.py`
-  - 기본 가격/거래량 필터
-- `app/strategy/universe_provider.py`
-  - 조건검색 대상 종목군 공급
-- `app/strategy/strategy_runner.py`
-  - 전략 플러그인 실행기
-- `app/strategy/strategy_loader.py`
-  - 전략 플러그인 로더
-- `app/strategy/plugins/price_volume_plugin.py`
-  - 예시 전략 플러그인
-
-### 6. Order / Risk / Safety Layer
-
+  - 코드 기반 조건검색 엔진
 - `app/trading/order_manager.py`
-  - 매수/매도 주문 실행과 주문 결과 기록
+  - 매수/매도 주문 실행
 - `app/trading/position_manager.py`
-  - 계좌/보유종목/미체결 동기화
+  - 계좌/보유/미체결 동기화
 - `app/trading/sell_manager.py`
-  - 익절/손절 규칙 기반 매도 판단
-- `app/trading/risk_manager.py`
-  - 실행 환경 및 종목당 매수 금액 제한 검사
+  - 익절/손절 판단
+- `app/trading/trading_loop.py`
+  - 자동 운용 루프
 - `app/trading/safety_guard.py`
-  - 실전 방지, 블랙리스트, 일일 주문 한도, 장 시작/종료 버퍼 등 최종 안전장치
-- `app/trading/market_time.py`
-  - 장 운영 시간 체크
+  - 안전장치 검증
+- `app/strategy/strategy_runner.py`
+  - 전략 플러그인 실행
 
-### 7. Persistence Layer
+### Persistence / Notification / Report Layer
 
 - `app/database/db.py`
-  - SQLite 연결 및 스키마 초기화
+  - SQLite 연결 및 초기화
 - `app/database/repository.py`
-  - 스냅샷, 주문, 체결, 포지션, 조건검색 이벤트, 루프 실행 기록, 안전체크 저장
-- `app/database/schema.sql`
-  - 전체 테이블 정의
-
-### 8. Notification / Report Layer
-
+  - 각종 스냅샷, 주문, 체결, 이벤트 저장
 - `app/notifier/notification_service.py`
   - 콘솔/이메일/텔레그램 알림 라우팅
-- `app/report/performance_analyzer.py`
-  - 최근 거래/조건검색/알림/루프 기록 분석
-- `app/report/report_generator.py`
-  - Markdown 리포트 생성
 - `app/report/report_service.py`
-  - 리포트 생성 및 전송
+  - 거래 리포트 생성 및 알림
 
-## Data Flow
+## Current Scenario Files
 
-```mermaid
-flowchart LR
-    A[Kiwoom API Response] --> B[Trading / Strategy Logic]
-    B --> C[TradingRepository]
-    C --> D[(price_snapshot)]
-    C --> E[(orders)]
-    C --> F[(executions)]
-    C --> G[(positions)]
-    C --> H[(unfilled_orders)]
-    C --> I[(condition_events)]
-    C --> J[(condition_trade_decisions)]
-    C --> K[(code_condition_events)]
-    C --> L[(loop_runs)]
-    C --> M[(notifications)]
-    C --> N[(safety_checks)]
-    C --> O[(strategy_signals)]
-    C --> P[(system_logs)]
-```
+현재 시나리오 파일은 아래와 같습니다.
+
+| File | Purpose |
+| --- | --- |
+| `app/scenarios/simulation.py` | v1 이동평균 시뮬레이션 |
+| `app/scenarios/snapshot.py` | v2 현재가 스냅샷 조회 |
+| `app/scenarios/paper_order_test.py` | v3 모의 주문 테스트 |
+| `app/scenarios/position_tracking.py` | v4 주문/잔고 추적 |
+| `app/scenarios/kiwoom_condition_scan.py` | v5 키움 조건검색 |
+| `app/scenarios/code_condition_scan.py` | v5.1 코드 조건검색 |
+| `app/scenarios/kiwoom_condition_order.py` | v6 조건검색 기반 주문 평가 |
+| `app/scenarios/code_condition_order.py` | v6.1 코드 조건검색 기반 주문 평가 |
+| `app/scenarios/sell_exit_test.py` | v7 매도/청산 테스트 |
+| `app/scenarios/trading_loop.py` | v8 자동 운용 루프 |
+| `app/scenarios/trading_report.py` | v9 거래 리포트 |
+| `app/scenarios/safety_guard_test.py` | v10 안전장치 테스트 |
+| `app/scenarios/strategy_plugin_test.py` | v11 전략 플러그인 테스트 |
+| `app/scenarios/password_window.py` | password 비밀번호 창 호출 |
 
 ## RUN_VERSION Map
 
-`main.py`는 `RUN_VERSION` 값에 따라 아래 기능을 실행합니다.
+현재 통합 브랜치 기준 `RUN_VERSION` 매핑은 아래와 같습니다.
 
-| RUN_VERSION | 목적 |
+| RUN_VERSION | Purpose |
 | --- | --- |
 | `v1` | 이동평균 시뮬레이션 |
 | `v2` | 키움 현재가 스냅샷 조회 |
-| `v3` | 모의 시장가 매수 테스트 |
-| `v4` | 주문 및 포지션 추적 테스트 |
+| `v3` | 모의 주문 테스트 |
+| `v4` | 주문/잔고 추적 테스트 |
 | `v5` | 키움 조건검색 테스트 |
-| `v5.1` | 코드 기반 조건검색 테스트 |
+| `v5.1`, `v5_1` | 코드 기반 조건검색 테스트 |
 | `v6` | 조건검색 기반 주문 평가/실행 |
-| `v6.1` | 코드 조건검색 기반 주문 평가/실행 |
-| `v7` | 익절/손절 매도 로직 테스트 |
-| `v8`, `v8.2` | 자동 운용 루프 |
-| `v10` | 거래 리포트 생성 |
-| `v11` | 안전장치 테스트 |
-| `v12` | 전략 플러그인 테스트 |
+| `v6.1`, `v6_1` | 코드 조건검색 기반 주문 평가/실행 |
+| `v7` | 매도/청산 로직 테스트 |
+| `v8`, `v8.1`, `v8_1`, `v8.2`, `v8_2` | 자동 운용 루프 |
+| `v9` | 거래 리포트 생성 |
+| `v10` | 안전장치 테스트 |
+| `v11` | 전략 플러그인 테스트 |
 | `password` | 계좌 비밀번호 입력 창 호출 |
-
-## Key Characteristics
-
-- 장점
-  - 실전형 흐름에 가까운 구조
-  - 주문 전 다층 안전장치 적용
-  - SQLite 기반 추적/리포팅이 쉬움
-  - 조건검색, 전략 플러그인, 알림 채널로 확장 가능
-
-- 제약
-  - Windows 및 Kiwoom OpenAPI+ 환경 의존
-  - ActiveX 기반이라 이식성이 낮음
-  - `RUN_VERSION` 중심 구조라 기능이 늘수록 엔진이 커질 수 있음
-  - 테스트 코드와 백테스트 체계는 아직 없음
 
 ## Directory Structure
 
 ```text
 .
 |-- main.py
-|-- BRANCH_STRATEGY.md
 |-- config.py
 |-- requirements.txt
+|-- README.md
+|-- BRANCH_STRATEGY.md
 |-- config/
-|   `-- settings.yaml
+|   |-- settings.yaml
+|   `-- .env.example
 |-- app/
 |   |-- database/
 |   |-- kiwoom/
@@ -271,13 +228,6 @@ flowchart LR
 |-- logs/
 `-- reports/
 ```
-
-## Requirements
-
-- Windows
-- Kiwoom OpenAPI+ 설치
-- PyQt5
-- 32-bit Python 환경 검토 필요
 
 ## Install
 
@@ -295,14 +245,50 @@ pip install -r requirements.txt
 python main.py
 ```
 
+## Test Strategy
+
+권장 테스트는 `동시 실행`이 아니라 `순차 실행`입니다.
+
+1. 문법 검사
+
+```bash
+python -m compileall app main.py config.py
+```
+
+2. registry 확인
+
+```bash
+python -c "from app.scenarios.registry import SCENARIO_REGISTRY; print(sorted(SCENARIO_REGISTRY.keys()))"
+```
+
+3. `settings.yaml`의 `run_version`을 바꿔가며 시나리오별 테스트
+
+예:
+
+```yaml
+app:
+  run_version: v1
+```
+
+```bash
+python main.py
+```
+
 ## Recommended Reading Order
 
-프로젝트를 빠르게 이해하려면 아래 순서가 좋습니다.
+빠르게 구조를 파악하려면 아래 순서를 추천합니다.
 
 1. `main.py`
 2. `config.py`
-3. `app/trading/trading_engine.py`
-4. `app/trading/trading_loop.py`
+3. `app/scenarios/registry.py`
+4. `app/trading/trading_engine.py`
 5. `app/kiwoom/kiwoom_api.py`
 6. `app/trading/order_manager.py`
-7. `app/database/repository.py`
+7. `app/trading/trading_loop.py`
+8. `app/database/repository.py`
+
+## Notes
+
+- `clean-base`는 공통 기반 브랜치입니다.
+- 새 독립 기능은 보통 `clean-base`에서 새 `feature/*` 브랜치를 만들어 추가합니다.
+- 기존 기능 개선은 상황에 따라 `main` 또는 통합 브랜치를 기준으로 진행할 수 있습니다.
