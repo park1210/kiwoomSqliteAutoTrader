@@ -21,6 +21,8 @@ SCENARIO_REGISTRY = {
     "v3": PaperOrderTestScenario,
     "v4": PositionTrackingScenario,
     "v5": KiwoomConditionScanScenario,
+    "v5.1": CodeConditionScanScenario,
+    "v5_1": CodeConditionScanScenario,
 }
 
 
