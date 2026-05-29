@@ -15,12 +15,10 @@ from app.scenarios.trading_report import TradingReportScenario
 
 
 SCENARIO_REGISTRY = {
-<<<<<<< HEAD
+
     "password": PasswordWindowScenario,
     "v1": SimulationScenario,
-=======
     "v2": SnapshotScenario,
->>>>>>> feature/v2-kiwoom-api
 }
 
 
