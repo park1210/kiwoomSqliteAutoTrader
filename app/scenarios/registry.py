@@ -15,10 +15,10 @@ from app.scenarios.trading_report import TradingReportScenario
 
 
 SCENARIO_REGISTRY = {
-
     "password": PasswordWindowScenario,
     "v1": SimulationScenario,
     "v2": SnapshotScenario,
+    "v3": PaperOrderTestScenario,
 }
 
 
