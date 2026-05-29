@@ -32,6 +32,7 @@ SCENARIO_REGISTRY = {
     "v8_1": TradingLoopScenario,
     "v8.2": TradingLoopScenario,
     "v8_2": TradingLoopScenario,
+    "v9": TradingReportScenario,
 }
 
 
